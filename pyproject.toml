@@ -1,0 +1,11 @@
+[project]
+name = "b3th"
+version = "0.1.0"
+dependencies = [
+  "gitpython>=3.1",
+  "openai>=0.27",
+  "PyGithub>=1.55",
+  "typer>=0.9"
+]
+[project.scripts]
+b3th = "b3th.cli:app"
