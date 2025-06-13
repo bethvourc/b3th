@@ -1,11 +1,25 @@
-[project]
+[build-system]
+# Poetry uses poetry-core for PEP 517 builds
+requires = ["poetry-core>=1.6.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
 name = "b3th"
 version = "0.1.0"
-dependencies = [
-  "gitpython>=3.1",
-  "openai>=0.27",
-  "PyGithub>=1.55",
-  "typer>=0.9"
-]
-[project.scripts]
+description = "CLI that auto-generates commit messages and GitHub PR descriptions"
+authors = ["Bethvour newbeth47@gmail.com"]
+readme = "README.md"
+license = "MIT"
+
+[tool.poetry.dependencies]
+python = ">=3.9"
+typer = "^0.12"        # CLI framework 
+requests = "^2.32"     # HTTP client for Groq / GitHub
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.2"
+coverage = "^7.5"
+black = "^24.4"
+
+[tool.poetry.scripts]
 b3th = "b3th.cli:app"

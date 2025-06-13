@@ -1,0 +1,28 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environments
+.env
+venv/
+
+# Packaging
+build/
+dist/
+*.egg-info/
+poetry.lock
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/
+requirements.txt
+
+# Others
+implementation.md
