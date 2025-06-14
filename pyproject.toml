@@ -20,6 +20,7 @@ requests = "^2.32"     # HTTP client for Groq / GitHub
 pytest = "^8.2"
 coverage = "^7.5"
 black = "^24.4"
+python-dotenv = "^1.1.0"
 
 [tool.poetry.scripts]
 b3th = "b3th.cli:app"

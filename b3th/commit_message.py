@@ -18,7 +18,6 @@ class CommitMessageError(RuntimeError):
     """Raised when a commit message cannot be generated."""
 
 
-
 # Prompt building helpers
 _SYSTEM_PROMPT: str = (
     "You are an expert Git assistant. "
@@ -51,12 +50,11 @@ def _build_messages(diff: str) -> List[dict[str, str]]:
     ]
 
 
-
 # Public API
 def generate_commit_message(
     repo_path: str | Path = ".",
     *,
-    model: str = "mixtral-8x7b-32768",
+    model: str | None = None,
     temperature: float = 0.2,
     max_tokens: int = 300,
 ) -> Tuple[str, str]:
@@ -75,7 +73,7 @@ def generate_commit_message(
     try:
         response = llm.chat_completion(
             _build_messages(diff),
-            model=model,
+            model=model,  # None → llm._default_model()
             temperature=temperature,
             max_tokens=max_tokens,
         )
@@ -84,7 +82,7 @@ def generate_commit_message(
 
     # Parse: first non-empty line = subject, rest (after first blank) = body
     lines = [ln.rstrip() for ln in response.splitlines()]
-    # drop leading/trailing blank lines for robustness
+    # drop leading/trailing blank lines
     while lines and not lines[0]:
         lines.pop(0)
     while lines and not lines[-1]:

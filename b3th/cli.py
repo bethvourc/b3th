@@ -9,7 +9,12 @@ import subprocess
 from pathlib import Path
 from typing import Optional
 
-import typer
+# Load environment variables 
+from dotenv import load_dotenv
+
+load_dotenv()  # reads .env in project root (if present) before other imports
+
+import typer  # noqa: E402  (imported after dotenv so env vars are ready)
 
 from .commit_message import CommitMessageError, generate_commit_message
 from .git_utils import is_git_repo

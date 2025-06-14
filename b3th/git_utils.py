@@ -29,7 +29,7 @@ def _run_git(args: List[str], cwd: Path | str | None = None) -> str:
     return result.stdout.strip()
 
 
-# Public helpers -----------------------------------------------------------
+# Public helpers 
 
 
 def is_git_repo(path: Path | str = ".") -> bool:

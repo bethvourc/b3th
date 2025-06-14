@@ -34,12 +34,20 @@ def _api_base() -> str:
     return os.getenv("GROQ_API_BASE", "https://api.groq.com").rstrip("/")
 
 
+def _default_model() -> str:
+    """
+    Return the default model for chat completions.
+
+    You can override it with GROQ_MODEL_ID.
+    """
+    return os.getenv("GROQ_MODEL_ID", "llama-3.3-70b-versatile")
+
 
 # Public function
 def chat_completion(
     messages: List[Dict[str, str]],
     *,
-    model: str = "mixtral-8x7b-32768",
+    model: str | None = None,
     temperature: float = 0.3,
     max_tokens: int = 512,
     stream: bool = False,
@@ -52,13 +60,13 @@ def chat_completion(
     messages
         A list of message dicts (role/content) compatible with the OpenAI schema.
     model
-        Groq model ID (default = Mixtral long-context model).
+        Groq model ID. If None, `_default_model()` is used.
     temperature
         Sampling temperature.
     max_tokens
         Maximum tokens for the reply.
     stream
-        Whether to request a streaming response (not yet surfaced by this wrapper).
+        Whether to request a streaming response (not surfaced by this wrapper).
 
     Returns
     -------
@@ -69,8 +77,8 @@ def chat_completion(
         "Authorization": f"Bearer {_api_key()}",
         "Content-Type": "application/json",
     }
-    payload: dict[str, Any] = {
-        "model": model,
+    payload: Dict[str, Any] = {
+        "model": model or _default_model(),
         "messages": messages,
         "temperature": temperature,
         "max_tokens": max_tokens,
