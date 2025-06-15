@@ -8,29 +8,25 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-# Load environment variables early 
 from dotenv import load_dotenv
 
-load_dotenv()  # reads .env in project root (if present)
+load_dotenv()  # auto-load .env before other imports
 
-import typer  # noqa: E402  (import after dotenv so env vars are ready)
+import typer  # noqa: E402
 
 from .commit_message import CommitMessageError, generate_commit_message
-from .git_utils import is_git_repo
+from .git_utils import get_current_branch, is_git_repo
 from .pr_description import PRDescriptionError, generate_pr_description
-from .gh_api import (
-    create_pull_request,
-    GitHubAPIError,
-    GitRepoError,
-)  # noqa: E402  (after dotenv)
+from .gh_api import GitHubAPIError, GitRepoError, create_pull_request
 
 app = typer.Typer(
-    help="Generate AI-assisted commit messages and GitHub PR descriptions."
+    help="Generate AI-assisted commit messages and GitHub pull-requests."
 )
 
-# commit command
-@app.command()
-def commit(
+
+# sync  (stage → commit → push)
+@app.command(name="sync")
+def sync(
     repo: Path = typer.Argument(
         Path("."), exists=False, dir_okay=True, file_okay=False, writable=True
     ),
@@ -38,16 +34,24 @@ def commit(
         False,
         "--yes",
         "-y",
-        help="Skip interactive confirmation and commit immediately.",
+        help="Skip interactive confirmation and run non-interactively.",
     ),
 ) -> None:
     """
-    Generate a commit message from staged changes and create the commit.
+    Stage **all** changes, generate an AI commit message, commit, and push the
+    current branch to ``origin``.
     """
     if not is_git_repo(repo):
         typer.secho("Error: not inside a Git repository.", fg=typer.colors.RED)
         raise typer.Exit(1)
 
+    # git add --all 
+    res = subprocess.run(["git", "add", "--all"], cwd=repo)  # noqa: S603,S607
+    if res.returncode != 0:
+        typer.secho("git add failed.", fg=typer.colors.RED)
+        raise typer.Exit(res.returncode)
+
+    # Generate commit message
     try:
         subject, body = generate_commit_message(repo)
     except CommitMessageError as exc:
@@ -60,43 +64,56 @@ def commit(
         typer.echo("\n" + body)
 
     if not yes:
-        if not typer.confirm("\nProceed with git commit?"):
-            typer.echo("Cancelled – no commit created.")
+        if not typer.confirm("\nProceed with commit & push?"):
+            typer.echo("Cancelled – nothing committed.")
             raise typer.Exit()
 
+    # 3. git commit
     args: list[str] = ["git", "commit", "-m", subject]
     if body:
         args.extend(["-m", body])
 
-    result = subprocess.run(args)  # noqa: S603,S607  (trusted local call)
-    if result.returncode != 0:
+    res = subprocess.run(args, cwd=repo)  # noqa: S603,S607
+    if res.returncode != 0:
         typer.secho("git commit failed.", fg=typer.colors.RED)
-        raise typer.Exit(result.returncode)
+        raise typer.Exit(res.returncode)
 
-    typer.secho("✅ Commit created.", fg=typer.colors.GREEN)
+    # 4. git push 
+    branch = get_current_branch(repo)
+    push_res = subprocess.run(
+        ["git", "push", "-u", "origin", branch], cwd=repo
+    )  # noqa: S603,S607
+    if push_res.returncode != 0:
+        typer.secho(
+            "git push failed. Does 'origin' exist and is authentication set?",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(push_res.returncode)
+
+    typer.secho("💻 Synced! Commit pushed to origin.", fg=typer.colors.GREEN)
 
 
 
-# prcreate command
+# deprecated: commit  (proxy to sync)
+@app.command(hidden=True)
+def commit(*args, **kwargs):  # noqa: ANN001
+    """DEPRECATED – use `b3th sync`."""
+    typer.secho(
+        "Warning: `b3th commit` is deprecated. Use `b3th sync` instead.",
+        fg=typer.colors.YELLOW,
+    )
+    sync(*args, **kwargs)  # delegate
 
 
+
+# prcreate  
 @app.command()
 def prcreate(
     repo: Path = typer.Argument(
         Path("."), exists=False, dir_okay=True, file_okay=False, writable=True
     ),
-    base: str = typer.Option(
-        "main",
-        "--base",
-        "-b",
-        help="Base branch to merge into (default: main).",
-    ),
-    yes: bool = typer.Option(
-        False,
-        "--yes",
-        "-y",
-        help="Skip interactive confirmation and open PR immediately.",
-    ),
+    base: str = typer.Option("main", "--base", "-b"),
+    yes: bool = typer.Option(False, "--yes", "-y"),
 ) -> None:
     """
     Generate a pull-request title/body and open the PR on GitHub.
@@ -105,7 +122,6 @@ def prcreate(
         typer.secho("Error: not inside a Git repository.", fg=typer.colors.RED)
         raise typer.Exit(1)
 
-    # Step 1: Let the LLM craft the PR description
     try:
         title, body = generate_pr_description(repo, base=base)
     except PRDescriptionError as exc:
@@ -118,10 +134,9 @@ def prcreate(
 
     if not yes:
         if not typer.confirm("\nProceed to create PR on GitHub?"):
-            typer.echo("Cancelled – no pull-request created.")
+            typer.echo("Cancelled – no PR created.")
             raise typer.Exit()
 
-    # Step 2: Call GitHub API
     try:
         pr_url = create_pull_request(title, body, repo_path=repo, base=base)
     except (GitRepoError, GitHubAPIError) as exc:

@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  tests:
+    name: "Python ${{ matrix.python-version }}"
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
+
+    steps:
+      # Checkout code 
+      - uses: actions/checkout@v4
+
+      # Set up Python & cache Poetry env 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "poetry"
+
+      # Install Poetry itself 
+      - uses: abatilo/actions-poetry@v3
+        with:
+          poetry-version: "1.8.3"
+
+      # Install project + dev deps 
+      - name: Install dependencies
+        run: poetry install --no-interaction --no-root
+
+      # Run tests with coverage gate
+      - name: Run tests & enforce 85% coverage
+        run: |
+          poetry run coverage run -m pytest
+          poetry run coverage report --fail-under=85

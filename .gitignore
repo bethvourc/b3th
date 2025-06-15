@@ -25,4 +25,6 @@ htmlcov/
 requirements.txt
 
 # Others
-implementation.md
+implementation*
+build_and_publish.md
+b3th*
