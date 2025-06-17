@@ -28,6 +28,15 @@ def _run_git(args: List[str], cwd: Path | str | None = None) -> str:
         raise GitError(result.stderr.strip() or f"git {' '.join(args)} failed")
     return result.stdout.strip()
 
+def run_git(args: List[str], cwd: Path | str | None = None) -> str:
+    """
+    Public helper that wraps the private _run_git().
+
+    Intended for other modules (stats, summarizer, etc.) that need to run
+    arbitrary Git commands without duplicating shell logic.
+    """
+    return _run_git(args, cwd=cwd)
+
 
 # Public helpers 
 

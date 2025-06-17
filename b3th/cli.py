@@ -18,9 +18,11 @@ from .commit_message import CommitMessageError, generate_commit_message
 from .git_utils import get_current_branch, is_git_repo
 from .pr_description import PRDescriptionError, generate_pr_description
 from .gh_api import GitHubAPIError, GitRepoError, create_pull_request
+from .stats import get_stats
+from .summarizer import summarize_commits
 
 app = typer.Typer(
-    help="Generate AI-assisted commit messages and GitHub pull-requests."
+    help="Generate AI-assisted commits, sync, and pull-requests."
 )
 
 
@@ -38,8 +40,8 @@ def sync(
     ),
 ) -> None:
     """
-    Stage **all** changes, generate an AI commit message, commit, and push the
-    current branch to ``origin``.
+    Stage all changes, generate an AI commit message, commit, and push the
+    current branch to `origin`.
     """
     if not is_git_repo(repo):
         typer.secho("Error: not inside a Git repository.", fg=typer.colors.RED)
@@ -104,7 +106,48 @@ def commit(*args, **kwargs):  # noqa: ANN001
     )
     sync(*args, **kwargs)  # delegate
 
+@app.command()
+def stats(
+    repo: Path = typer.Argument(
+        Path("."), exists=False, dir_okay=True, file_okay=False
+    ),
+    last: str = typer.Option(
+        None,
+        "--last",
+        "-l",
+        help="Time-frame (e.g. 7d, 1m).",
+    ),
+) -> None:
+    """
+    Show repository statistics.
+    """
+    from .stats import print_stats  # local import to avoid CLI startup cost
 
+    print_stats(repo, last=last) 
+
+@app.command(name="summarize")
+def summarize(
+    repo: Path = typer.Argument(
+        Path("."), exists=False, dir_okay=True, file_okay=False
+    ),
+    n: int = typer.Option(
+        10,
+        "--last",
+        "-n",
+        help="Number of commits to summarize (default: 10).",
+    ),
+) -> None:
+    """
+    Summarize the last *n* commits (placeholder).
+
+    Example:
+        b3th summarize -n 5
+    """
+    summary = summarize_commits(str(repo), n=n)
+    if summary:
+        typer.echo(summary)
+    else:
+        typer.echo("summarizer feature not implemented yet. 🚧")
 
 # prcreate  
 @app.command()
