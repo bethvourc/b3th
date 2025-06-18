@@ -14,31 +14,28 @@ jobs:
         python-version: ["3.9", "3.10", "3.11", "3.12"]
 
     steps:
-      # Checkout
+      # Checkout source
       - uses: actions/checkout@v4
 
-      # Python & Poetry cache
+      # Set up Python (no Poetry cache because poetry.lock is not committed)
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-          cache: "poetry"
 
+      # Install Poetry
       - uses: abatilo/actions-poetry@v3
         with:
           poetry-version: "1.8.3"
 
-      # Install deps
+      # Install project + dev dependencies
       - name: Install dependencies
         run: poetry install --no-interaction --no-root
 
-      # Tests + coverage
-      - name: Run tests & enforce coverage
+      # Run tests with coverage (dummy tokens avoid real API calls)
+      - name: Run tests & enforce 80 % coverage
         env:
-          # Dummy tokens so code paths that read env vars never fail
-          GROQ_API_KEY: "dummy"
-          GITHUB_TOKEN: "dummy"
+          GROQ_API_KEY: dummy
+          GITHUB_TOKEN: dummy
         run: |
-          poetry run coverage run \
-            --omit='*/tests/*,*/.venv/*' \
-            -m pytest -qq
+          poetry run coverage run --omit='*/tests/*,*/.venv/*' -m pytest -qq
           poetry run coverage report --fail-under=80
