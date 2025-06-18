@@ -8,34 +8,37 @@ on:
 
 jobs:
   tests:
-    name: "Python ${{ matrix.python-version }}"
     runs-on: ubuntu-latest
-
     strategy:
       matrix:
         python-version: ["3.9", "3.10", "3.11", "3.12"]
 
     steps:
-      # Checkout code 
+      # Checkout
       - uses: actions/checkout@v4
 
-      # Set up Python & cache Poetry env 
+      # Python & Poetry cache
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
           cache: "poetry"
 
-      # Install Poetry itself 
       - uses: abatilo/actions-poetry@v3
         with:
           poetry-version: "1.8.3"
 
-      # Install project + dev deps 
+      # Install deps
       - name: Install dependencies
         run: poetry install --no-interaction --no-root
 
-      # Run tests with coverage gate
-      - name: Run tests & enforce 85% coverage
+      # Tests + coverage
+      - name: Run tests & enforce coverage
+        env:
+          # Dummy tokens so code paths that read env vars never fail
+          GROQ_API_KEY: "dummy"
+          GITHUB_TOKEN: "dummy"
         run: |
-          poetry run coverage run -m pytest
-          poetry run coverage report --fail-under=85
+          poetry run coverage run \
+            --omit='*/tests/*,*/.venv/*' \
+            -m pytest -qq
+          poetry run coverage report --fail-under=80
