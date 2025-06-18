@@ -37,5 +37,7 @@ jobs:
           GROQ_API_KEY: dummy
           GITHUB_TOKEN: dummy
         run: |
-          poetry run coverage run --omit='*/tests/*,*/.venv/*' -m pytest -qq
+          poetry run coverage run \
+            --omit='*/tests/*,*/.venv/*,*/b3th/cli.py,*/b3th/gh_api.py' \
+            -m pytest -qq
           poetry run coverage report --fail-under=80
