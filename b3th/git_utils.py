@@ -72,3 +72,33 @@ def get_staged_diff(path: Path | str = ".") -> str:
     An empty string means nothing is currently staged.
     """
     return _run_git(["diff", "--staged"], cwd=path)
+
+
+# New helper: last-N commits
+def get_last_commits(
+    path: Path | str = ".", n: int = 10
+) -> list[dict[str, str]]:  # pragma: no cover
+    """
+    Return metadata for the last *n* commits on the current branch.
+
+    Each dict contains:
+        { "hash": <full>, "abbrev": <short>, "author": <name>,
+          "date": <YYYY-MM-DD>, "subject": <message> }
+    """
+    fmt = "%H%x1f%h%x1f%an%x1f%ad%x1f%s"
+    raw = _run_git(
+        ["log", f"-n{n}", "--date=short", f"--pretty={fmt}"], cwd=path
+    )
+    commits = []
+    for line in raw.splitlines():
+        full, short, author, date, subject = line.split("\x1f")
+        commits.append(
+            {
+                "hash": full,
+                "abbrev": short,
+                "author": author,
+                "date": date,
+                "subject": subject.strip(),
+            }
+        )
+    return commits
