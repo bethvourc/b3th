@@ -146,3 +146,60 @@ def create_pull_request(
         raise GitHubAPIError("GitHub response missing html_url field")
 
     return str(html_url)
+
+
+# --------------------------------------------------------------------------- #
+# Draft PR helper
+# --------------------------------------------------------------------------- #
+def create_draft_pull_request(
+    title: str,
+    body: str,
+    *,
+    repo_path: Path | str = ".",
+    base: str = "main",
+    head: str | None = None,
+) -> str:
+    """
+    Same as ``create_pull_request`` but opens the PR in **draft** mode.
+
+    Returns
+    -------
+    str
+        HTML URL of the new draft pull-request.
+    """
+    repo_path = Path(repo_path)
+
+    if not is_git_repo(repo_path):
+        raise GitRepoError(f"{repo_path} is not a Git repository")
+
+    token = get_github_token()
+
+    # Ensure branch is present on origin
+    head_branch = head or _push_current_branch(repo_path)
+
+    slug = _get_repo_slug(repo_path)
+    url = f"https://api.github.com/repos/{slug}/pulls"
+
+    headers = {
+        "Authorization": f"token {token}",
+        "Accept": "application/vnd.github+json",
+    }
+    payload: Mapping[str, Any] = {
+        "title": title,
+        "head": head_branch,
+        "base": base,
+        "body": body,
+        "draft": True,                 # key difference
+        "maintainer_can_modify": True,
+    }
+
+    resp = requests.post(url, headers=headers, json=payload, timeout=30)
+    if resp.status_code not in (200, 201):
+        raise GitHubAPIError(f"GitHub API error {resp.status_code}: {resp.text}")
+
+    data = resp.json()
+    html_url = data.get("html_url")
+    if not html_url:
+        raise GitHubAPIError("GitHub response missing html_url field")
+
+    return str(html_url)

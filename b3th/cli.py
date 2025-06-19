@@ -17,7 +17,12 @@ import typer  # noqa: E402
 from .commit_message import CommitMessageError, generate_commit_message
 from .git_utils import get_current_branch, is_git_repo
 from .pr_description import PRDescriptionError, generate_pr_description
-from .gh_api import GitHubAPIError, GitRepoError, create_pull_request
+from .gh_api import (
+    create_pull_request,
+    create_draft_pull_request,   
+    GitHubAPIError,
+    GitRepoError,
+)
 from .stats import get_stats
 from .summarizer import summarize_commits
 
@@ -149,7 +154,50 @@ def summarize(
     else:
         typer.echo("summarizer feature not implemented yet. 🚧")
 
-# prcreate  
+# prdraft  – open a draft PR
+@app.command()
+def prdraft(
+    repo: Path = typer.Argument(
+        Path("."), exists=False, dir_okay=True, file_okay=False, writable=True
+    ),
+    base: str = typer.Option("main", "--base", "-b", help="Target branch"),
+    yes: bool = typer.Option(
+        False, "--yes", "-y", help="Skip confirmation and open draft PR."
+    ),
+) -> None:
+    """
+    Create a **draft** pull-request on GitHub for the current branch.
+    """
+    if not is_git_repo(repo):
+        typer.secho("Error: not inside a Git repository.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    try:
+        title, body = generate_pr_description(repo, base=base)
+    except PRDescriptionError as exc:
+        typer.secho(f"Error: {exc}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    typer.echo("\nProposed draft PR:")
+    typer.echo(typer.style(title, fg=typer.colors.GREEN, bold=True))
+    typer.echo("\n" + body)
+
+    if not yes:
+        if not typer.confirm("\nProceed to create *draft* PR on GitHub?"):
+            typer.echo("Cancelled – no draft PR created.")
+            raise typer.Exit()
+
+    try:
+        pr_url = create_draft_pull_request(title, body, repo_path=repo, base=base)
+    except (GitRepoError, GitHubAPIError) as exc:
+        typer.secho(f"Error: {exc}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    typer.secho("\n✅ Draft pull request created!", fg=typer.colors.GREEN, bold=True)
+    typer.echo(pr_url)
+
+
+# prcreate - create a pr
 @app.command()
 def prcreate(
     repo: Path = typer.Argument(
