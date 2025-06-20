@@ -10,6 +10,7 @@
 | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `b3th sync`      | **Stage → commit → push** in one shot. b3th asks an LLM for a succinct commit subject + body, then runs `git add --all`, `git commit`, and `git push -u origin &lt;branch&gt;`. |
 | `b3th prcreate`  | Pushes the current branch (if needed), summarises commits + diff, and opens a GitHub pull-request, returning the PR URL.                                                        |
+| `b3th prdraft`   | Opens a **draft** pull-request (marked “Draft” on GitHub) after generating the title/body with the LLM.                                                                         |
 | `b3th stats`     | Shows commit count, unique files touched, and line additions/deletions for a given time-frame (e.g. `--last 7d`).                                                               |
 | `b3th summarize` | Uses an LLM to produce a one-paragraph summary of the last _N_ commits (default 10).                                                                                            |
 
@@ -84,6 +85,10 @@ poetry run b3th sync -y                # non-interactive
 # Create a pull-request into 'main'
 poetry run b3th prcreate               # interactive
 poetry run b3th prcreate -b develop -y # specify base branch, skip confirm
+
+# Create a draft pull-request to 'main'
+poetry run b3th prdraft               # interactive confirm
+poetry run b3th prdraft -b develop -y # specify base branch, skip confirm
 
 # Git statistics (last 7 days)
 poetry run b3th stats --last 7d

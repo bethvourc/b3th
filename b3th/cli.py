@@ -166,7 +166,10 @@ def prdraft(
     ),
 ) -> None:
     """
-    Create a **draft** pull-request on GitHub for the current branch.
+    Open a **draft** pull-request on GitHub.
+
+    Draft PRs are useful for early feedback without triggering reviewers.
+    
     """
     if not is_git_repo(repo):
         typer.secho("Error: not inside a Git repository.", fg=typer.colors.RED)
