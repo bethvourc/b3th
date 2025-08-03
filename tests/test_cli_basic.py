@@ -5,6 +5,7 @@ runner = CliRunner()
 
 
 def test_help_runs() -> None:
+    """`b3th --help` should exit cleanly and list the main commands."""
     result = runner.invoke(app, ["--help"])
     assert result.exit_code == 0
     # basic sanity checks

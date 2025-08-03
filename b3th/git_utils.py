@@ -16,9 +16,11 @@ class GitError(RuntimeError):
     """Raised when an underlying git command fails."""
 
 
+
+# Internal helper
 def _run_git(args: List[str], cwd: Path | str | None = None) -> str:
     """Run `git <args>` and return stdout, raising GitError on failure."""
-    result = subprocess.run(  # noqa: S603,S607 (trusted local call)
+    result = subprocess.run(                           # noqa: S603,S607
         ["git", *args],
         cwd=cwd,
         capture_output=True,
@@ -28,6 +30,8 @@ def _run_git(args: List[str], cwd: Path | str | None = None) -> str:
         raise GitError(result.stderr.strip() or f"git {' '.join(args)} failed")
     return result.stdout.strip()
 
+
+# Public convenience wrapper
 def run_git(args: List[str], cwd: Path | str | None = None) -> str:
     """
     Public helper that wraps the private _run_git().
@@ -39,8 +43,6 @@ def run_git(args: List[str], cwd: Path | str | None = None) -> str:
 
 
 # Public helpers 
-
-
 def is_git_repo(path: Path | str = ".") -> bool:
     """Return True if *path* is inside a Git working tree."""
     try:
@@ -74,7 +76,44 @@ def get_staged_diff(path: Path | str = ".") -> str:
     return _run_git(["diff", "--staged"], cwd=path)
 
 
-# New helper: last-N commits
+
+# helper: detect unresolved merge conflicts
+def has_merge_conflicts(path: Path | str = ".") -> bool:  # pragma: no cover
+    """
+    Return ``True`` if the working tree under *path* contains any unresolved
+    merge conflicts.
+
+    Detection strategy
+    ------------------
+    • Use ``git grep -l "<<<<<<<"`` — Git writes this exact marker at the start
+      of the “ours” hunk whenever it cannot auto-merge.
+    • Exit-status semantics:
+
+        0 → at least one match (conflict present)  
+        1 → no match (clean)  
+        ≥2 → actual error → raise ``GitError``
+
+    Raises
+    ------
+    GitError
+        If *git grep* fails for reasons other than “no match”.
+    """
+    result = subprocess.run(                            # noqa: S603,S607
+        ["git", "grep", "-l", "<<<<<<<", "--", "."],
+        cwd=path,
+        capture_output=True,
+        text=True,
+    )
+
+    if result.returncode == 0:
+        return True          # conflict markers found
+    if result.returncode == 1:
+        return False         # no markers
+    # Anything else is a genuine error
+    raise GitError(result.stderr.strip() or "git grep failed")
+
+
+# Helper: last-N commits
 def get_last_commits(
     path: Path | str = ".", n: int = 10
 ) -> list[dict[str, str]]:  # pragma: no cover
@@ -89,7 +128,7 @@ def get_last_commits(
     raw = _run_git(
         ["log", f"-n{n}", "--date=short", f"--pretty={fmt}"], cwd=path
     )
-    commits = []
+    commits: list[dict[str, str]] = []
     for line in raw.splitlines():
         full, short, author, date, subject = line.split("\x1f")
         commits.append(
