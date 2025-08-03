@@ -6,6 +6,7 @@ This module hides the HTTP details so the rest of the codebase can call
 """
 
 from __future__ import annotations
+from typing import Optional, Union
 
 import os
 from typing import List, Dict, Any
@@ -47,7 +48,7 @@ def _default_model() -> str:
 def chat_completion(
     messages: List[Dict[str, str]],
     *,
-    model: str | None = None,
+    model: Optional[str] = None,
     temperature: float = 0.3,
     max_tokens: int = 512,
     stream: bool = False,

@@ -10,6 +10,7 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 from typing import List
+from typing import List, Optional, Union
 
 
 class GitError(RuntimeError):
@@ -18,7 +19,7 @@ class GitError(RuntimeError):
 
 
 # Internal helper
-def _run_git(args: List[str], cwd: Path | str | None = None) -> str:
+def _run_git(args: List[str], cwd: Optional[Union[Path, str]] = None) -> str:
     """Run `git <args>` and return stdout, raising GitError on failure."""
     result = subprocess.run(                           # noqa: S603,S607
         ["git", *args],
@@ -32,7 +33,7 @@ def _run_git(args: List[str], cwd: Path | str | None = None) -> str:
 
 
 # Public convenience wrapper
-def run_git(args: List[str], cwd: Path | str | None = None) -> str:
+def run_git(args: List[str], cwd: Path | Optional[str] = None) -> str:
     """
     Public helper that wraps the private _run_git().
 
@@ -43,7 +44,7 @@ def run_git(args: List[str], cwd: Path | str | None = None) -> str:
 
 
 # Public helpers 
-def is_git_repo(path: Path | str = ".") -> bool:
+def is_git_repo(path: Union[str, Path] = ".") -> bool:
     """Return True if *path* is inside a Git working tree."""
     try:
         _run_git(["rev-parse", "--is-inside-work-tree"], cwd=path)
@@ -52,7 +53,7 @@ def is_git_repo(path: Path | str = ".") -> bool:
         return False
 
 
-def get_current_branch(path: Path | str = ".") -> str:
+def get_current_branch(path: Union[str, Path] = ".") -> str:
     """
     Return the current branch name for *path*.
 
@@ -68,7 +69,7 @@ def get_current_branch(path: Path | str = ".") -> str:
         return _run_git(["rev-parse", "--short", "HEAD"], cwd=path)
 
 
-def get_staged_diff(path: Path | str = ".") -> str:
+def get_staged_diff(path: Union[str, Path] = ".") -> str:
     """
     Return the unified diff of **staged** changes (index vs HEAD).
     An empty string means nothing is currently staged.
@@ -78,7 +79,7 @@ def get_staged_diff(path: Path | str = ".") -> str:
 
 
 # helper: detect unresolved merge conflicts
-def has_merge_conflicts(path: Path | str = ".") -> bool:  # pragma: no cover
+def has_merge_conflicts(path: Union[str, Path] = ".") -> bool:  # pragma: no cover
     """
     Return ``True`` if the working tree under *path* contains any unresolved
     merge conflicts.
@@ -115,7 +116,7 @@ def has_merge_conflicts(path: Path | str = ".") -> bool:  # pragma: no cover
 
 # Helper: last-N commits
 def get_last_commits(
-    path: Path | str = ".", n: int = 10
+    path: Union[str, Path] = ".", n: int = 10
 ) -> list[dict[str, str]]:  # pragma: no cover
     """
     Return metadata for the last *n* commits on the current branch.

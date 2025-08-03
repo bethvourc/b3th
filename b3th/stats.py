@@ -7,6 +7,7 @@ Example:
 """
 
 from __future__ import annotations
+from typing import Optional, Union
 
 import re
 from datetime import datetime, timedelta
@@ -22,7 +23,7 @@ class StatsError(RuntimeError):
 
 
 # Helpers
-def _parse_last(value: str | None) -> str | None:
+def _parse_last(value: Optional[str]) -> Optional[str]:
     """Convert '7d', '2w', '1m' to ISO date for `git --since`."""
     if value is None:
         return None
@@ -45,7 +46,7 @@ def _parse_last(value: str | None) -> str | None:
 
 # Core API
 def get_stats(
-    repo_path: str | Path = ".", *, last: str | None = None
+    repo_path: Union[str, Path] = ".", *, last: Optional[str] = None
 ) -> Dict[str, int]:
     """Return commit count, unique files changed, insertions, deletions."""
     repo_path = Path(repo_path)
@@ -96,7 +97,7 @@ def get_stats(
 
 # CLI helper
 def print_stats(
-    repo_path: str | Path = ".", last: str | None = None
+    repo_path: Union[str, Path] = ".", last: Optional[str] = None
 ) -> None:  # pragma: no cover
     """Pretty-print stats to stdout (used by `b3th stats`)."""
     data = get_stats(repo_path, last=last)

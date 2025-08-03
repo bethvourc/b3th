@@ -12,6 +12,7 @@ patch_click_make_metavar()
 
 import subprocess
 from pathlib import Path
+from typing import Optional
 
 from dotenv import load_dotenv
 
@@ -120,7 +121,7 @@ def stats(
     repo: Path = typer.Argument(
         Path("."), exists=False, dir_okay=True, file_okay=False
     ),
-    last: str | None = typer.Option(
+    last: Optional[str] = typer.Option( 
         None,
         "--last",
         "-l",

@@ -6,6 +6,7 @@ Usage:
 """
 
 from __future__ import annotations
+from typing import Optional, Union
 
 import subprocess
 import textwrap
@@ -21,7 +22,7 @@ class PRDescriptionError(RuntimeError):
 
 
 # Internal git helpers
-def _run_git(args: List[str], cwd: Path | str | None = None) -> str:
+def _run_git(args: List[str], cwd: Path | Optional[str] = None) -> str:
     """Run `git <args>` and return stdout (strip newline)."""
     result = subprocess.run(  # noqa: S603,S607
         ["git", *args],
@@ -34,12 +35,12 @@ def _run_git(args: List[str], cwd: Path | str | None = None) -> str:
     return result.stdout.strip()
 
 
-def _branch_diff(repo_path: Path | str, base: str) -> str:
+def _branch_diff(repo_path: Union[str, Path], base: str) -> str:
     """Return `git diff --stat` output between *base* and HEAD."""
     return _run_git(["diff", "--stat", f"{base}..HEAD"], cwd=repo_path)
 
 
-def _commit_messages(repo_path: Path | str, base: str) -> str:
+def _commit_messages(repo_path: Union[str, Path], base: str) -> str:
     """Return one-line commit summaries between *base* and HEAD (oldest→newest)."""
     return _run_git(
         ["log", "--reverse", "--pretty=%s", f"{base}..HEAD"], cwd=repo_path
@@ -90,10 +91,10 @@ def _build_messages(diff: str, commits: str) -> List[dict[str, str]]:
 
 # Public API
 def generate_pr_description(
-    repo_path: Path | str = ".",
+    repo_path: Union[str, Path] = ".",
     *,
     base: str = "main",
-    model: str | None = None,
+    model: Optional[str] = None,
     temperature: float = 0.2,
     max_tokens: int = 600,
 ) -> Tuple[str, str]:
