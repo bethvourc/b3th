@@ -1,13 +1,18 @@
+############################
+# Build system
+############################
 [build-system]
 requires = ["poetry-core>=1.6.0"]
 build-backend = "poetry.core.masonry.api"
 
-# Project metadata 
+############################
+# Project metadata
+############################
 [tool.poetry]
 name = "b3th"
-version = "0.1.0"          
+version = "0.1.0"
 description = "CLI that auto-generates commit messages and GitHub PR descriptions"
-authors = ["Bethvour bethvourc@gmail.com"]
+authors = ["Bethvour <bethvourc@gmail.com>"]
 license = "MIT"
 readme = "README.md"
 homepage = "https://github.com/bethvourc/b3th"
@@ -18,26 +23,35 @@ keywords = ["git", "cli", "commit", "pull-request", "ai", "groq"]
 "Bug Tracker" = "https://github.com/bethvourc/b3th/issues"
 "Source"      = "https://github.com/bethvourc/b3th"
 
+############################
 # Runtime dependencies
+############################
 [tool.poetry.dependencies]
-python = ">=3.9"
-typer = "^0.12"
+python = ">=3.9,<4.0"
+typer  = "^0.12"
+click  = ">=8.1.4,<9"           # ← Click ≥8.1 fixes make_metavar(ctx) issue
 requests = "^2.32"
 python-dotenv = "^1.0"
 
-# Development / tooling dependencies 
+############################
+# Development / tooling dependencies
+############################
 [tool.poetry.group.dev.dependencies]
-pytest = "^8.2"
-coverage = "^7.5"
-black = "^24.4"
-ruff = "^0.4"
+pytest     = "^8.2"
+coverage   = "^7.5"
+black      = "^24.4"
+ruff       = "^0.4"
 pre-commit = "^3.7"
 
-# CLI entry-point
+############################
+# CLI entry point
+############################
 [tool.poetry.scripts]
 b3th = "b3th.cli:app"
 
-# Black formatting settings 
+############################
+# Black formatting
+############################
 [tool.black]
 line-length = 88
 target-version = ["py39", "py310", "py311", "py312"]
@@ -52,7 +66,9 @@ exclude = '''
 )/
 '''
 
-# Ruff linting settings 
+############################
+# Ruff linting
+############################
 [tool.ruff]
 line-length = 88
 target-version = "py39"
@@ -60,8 +76,10 @@ select = ["E", "F", "B", "I", "UP", "S", "A", "C4"]
 ignore = ["E501"]
 exclude = ["build", "dist", ".venv"]
 
+############################
 # Optional: upload to TestPyPI before PyPI
+############################
 [[tool.poetry.source]]
 name = "testpypi"
-url = "https://test.pypi.org/legacy/"
-priority = "supplemental" 
+url  = "https://test.pypi.org/legacy/"
+priority = "supplemental"

@@ -5,6 +5,7 @@ Step 6: send commit list to Groq and return a natural-language paragraph.
 """
 
 from __future__ import annotations
+from typing import Optional, Union
 
 import textwrap
 from pathlib import Path
@@ -28,7 +29,7 @@ def _commits_markdown(commits: List[dict]) -> str:
 
 
 def prepare_commits_for_llm(
-    repo_path: str | Path = ".", n: int = 10
+    repo_path: Union[str, Path] = ".", n: int = 10
 ) -> str:
     """
     Return a Markdown bullet list of the last *n* commits.
@@ -60,7 +61,7 @@ _SYSTEM_PROMPT = (
 
 
 def summarize_commits(
-    repo_path: str | Path = ".", n: int = 10, *, model: str | None = None
+    repo_path: Union[str, Path] = ".", n: int = 10, *, model: Optional[str] = None
 ) -> str:
     """
     Return an LLM-generated paragraph summarising the last *n* commits.

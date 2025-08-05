@@ -6,6 +6,7 @@ Usage:
 """
 
 from __future__ import annotations
+from typing import Optional, Union
 
 import textwrap
 from pathlib import Path
@@ -52,9 +53,9 @@ def _build_messages(diff: str) -> List[dict[str, str]]:
 
 # Public API
 def generate_commit_message(
-    repo_path: str | Path = ".",
+    repo_path: Union[str, Path] = ".",
     *,
-    model: str | None = None,
+    model: Optional[str] = None,
     temperature: float = 0.2,
     max_tokens: int = 300,
 ) -> Tuple[str, str]:

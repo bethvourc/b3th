@@ -5,8 +5,14 @@ Run `poetry run b3th --help` to see available commands.
 
 from __future__ import annotations
 
+# Early-load compatibility patch
+from ._compat import patch_click_make_metavar
+
+patch_click_make_metavar()
+
 import subprocess
 from pathlib import Path
+from typing import Optional
 
 from dotenv import load_dotenv
 
@@ -19,7 +25,7 @@ from .git_utils import get_current_branch, is_git_repo
 from .pr_description import PRDescriptionError, generate_pr_description
 from .gh_api import (
     create_pull_request,
-    create_draft_pull_request,   
+    create_draft_pull_request,
     GitHubAPIError,
     GitRepoError,
 )
@@ -52,7 +58,7 @@ def sync(
         typer.secho("Error: not inside a Git repository.", fg=typer.colors.RED)
         raise typer.Exit(1)
 
-    # git add --all 
+    # git add --all
     res = subprocess.run(["git", "add", "--all"], cwd=repo)  # noqa: S603,S607
     if res.returncode != 0:
         typer.secho("git add failed.", fg=typer.colors.RED)
@@ -70,12 +76,11 @@ def sync(
     if body:
         typer.echo("\n" + body)
 
-    if not yes:
-        if not typer.confirm("\nProceed with commit & push?"):
-            typer.echo("Cancelled – nothing committed.")
-            raise typer.Exit()
+    if not yes and not typer.confirm("\nProceed with commit & push?"):
+        typer.echo("Cancelled – nothing committed.")
+        raise typer.Exit()
 
-    # 3. git commit
+    # git commit
     args: list[str] = ["git", "commit", "-m", subject]
     if body:
         args.extend(["-m", body])
@@ -85,11 +90,11 @@ def sync(
         typer.secho("git commit failed.", fg=typer.colors.RED)
         raise typer.Exit(res.returncode)
 
-    # 4. git push 
+    # git push
     branch = get_current_branch(repo)
     push_res = subprocess.run(
-        ["git", "push", "-u", "origin", branch], cwd=repo
-    )  # noqa: S603,S607
+        ["git", "push", "-u", "origin", branch], cwd=repo  # noqa: S603,S607
+    )
     if push_res.returncode != 0:
         typer.secho(
             "git push failed. Does 'origin' exist and is authentication set?",
@@ -99,9 +104,7 @@ def sync(
 
     typer.secho("💻 Synced! Commit pushed to origin.", fg=typer.colors.GREEN)
 
-
-
-# deprecated: commit  (proxy to sync)
+# DEPRECATED: commit  (proxy to sync)
 @app.command(hidden=True)
 def commit(*args, **kwargs):  # noqa: ANN001
     """DEPRECATED – use `b3th sync`."""
@@ -111,25 +114,27 @@ def commit(*args, **kwargs):  # noqa: ANN001
     )
     sync(*args, **kwargs)  # delegate
 
+
+# stats
 @app.command()
 def stats(
     repo: Path = typer.Argument(
         Path("."), exists=False, dir_okay=True, file_okay=False
     ),
-    last: str = typer.Option(
+    last: Optional[str] = typer.Option( 
         None,
         "--last",
         "-l",
         help="Time-frame (e.g. 7d, 1m).",
     ),
 ) -> None:
-    """
-    Show repository statistics.
-    """
+    """Show repository statistics."""
     from .stats import print_stats  # local import to avoid CLI startup cost
 
-    print_stats(repo, last=last) 
+    print_stats(repo, last=last)
 
+
+# summarize
 @app.command(name="summarize")
 def summarize(
     repo: Path = typer.Argument(
@@ -142,17 +147,10 @@ def summarize(
         help="Number of commits to summarize (default: 10).",
     ),
 ) -> None:
-    """
-    Summarize the last *n* commits (placeholder).
-
-    Example:
-        b3th summarize -n 5
-    """
+    """Summarize the last *n* commits."""
     summary = summarize_commits(str(repo), n=n)
-    if summary:
-        typer.echo(summary)
-    else:
-        typer.echo("summarizer feature not implemented yet. 🚧")
+    typer.echo(summary or "summarizer feature not implemented yet. 🚧")
+
 
 # prdraft  – open a draft PR
 @app.command()
@@ -165,12 +163,7 @@ def prdraft(
         False, "--yes", "-y", help="Skip confirmation and open draft PR."
     ),
 ) -> None:
-    """
-    Open a **draft** pull-request on GitHub.
-
-    Draft PRs are useful for early feedback without triggering reviewers.
-    
-    """
+    """Open a **draft** pull request on GitHub."""
     if not is_git_repo(repo):
         typer.secho("Error: not inside a Git repository.", fg=typer.colors.RED)
         raise typer.Exit(1)
@@ -185,10 +178,9 @@ def prdraft(
     typer.echo(typer.style(title, fg=typer.colors.GREEN, bold=True))
     typer.echo("\n" + body)
 
-    if not yes:
-        if not typer.confirm("\nProceed to create *draft* PR on GitHub?"):
-            typer.echo("Cancelled – no draft PR created.")
-            raise typer.Exit()
+    if not yes and not typer.confirm("\nProceed to create *draft* PR on GitHub?"):
+        typer.echo("Cancelled – no draft PR created.")
+        raise typer.Exit()
 
     try:
         pr_url = create_draft_pull_request(title, body, repo_path=repo, base=base)
@@ -200,7 +192,8 @@ def prdraft(
     typer.echo(pr_url)
 
 
-# prcreate - create a pr
+
+# prcreate  – open a regular PR
 @app.command()
 def prcreate(
     repo: Path = typer.Argument(
@@ -209,9 +202,7 @@ def prcreate(
     base: str = typer.Option("main", "--base", "-b"),
     yes: bool = typer.Option(False, "--yes", "-y"),
 ) -> None:
-    """
-    Generate a pull-request title/body and open the PR on GitHub.
-    """
+    """Generate a pull request title/body and open the PR on GitHub."""
     if not is_git_repo(repo):
         typer.secho("Error: not inside a Git repository.", fg=typer.colors.RED)
         raise typer.Exit(1)
@@ -222,14 +213,13 @@ def prcreate(
         typer.secho(f"Error: {exc}", fg=typer.colors.RED)
         raise typer.Exit(1)
 
-    typer.echo("\nProposed pull-request:")
+    typer.echo("\nProposed pull request:")
     typer.echo(typer.style(title, fg=typer.colors.GREEN, bold=True))
     typer.echo("\n" + body)
 
-    if not yes:
-        if not typer.confirm("\nProceed to create PR on GitHub?"):
-            typer.echo("Cancelled – no PR created.")
-            raise typer.Exit()
+    if not yes and not typer.confirm("\nProceed to create PR on GitHub?"):
+        typer.echo("Cancelled – no PR created.")
+        raise typer.Exit()
 
     try:
         pr_url = create_pull_request(title, body, repo_path=repo, base=base)

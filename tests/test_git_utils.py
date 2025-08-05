@@ -1,22 +1,44 @@
+"""
+Unit tests for b3th.git_utils helpers, including merge-conflict detection.
+"""
+
 from pathlib import Path
 import subprocess
+
+import pytest
 
 from b3th import git_utils
 
 
+# ────────────────────────────────────────────────────────────────────────────────
+# Helper to bootstrap a throw-away repo
+# ────────────────────────────────────────────────────────────────────────────────
+def _init_repo(repo: Path) -> None:
+    """Initialise a bare-bones repository with user identity configured."""
+    subprocess.run(["git", "init", "-q"], cwd=repo, check=True)  # noqa: S603
+    subprocess.run(
+        ["git", "config", "user.email", "tester@example.com"], cwd=repo, check=True
+    )
+    subprocess.run(
+        ["git", "config", "user.name", "Tester"], cwd=repo, check=True
+    )
+
+
+# ────────────────────────────────────────────────────────────────────────────────
+# Smoke-test: basic helpers
+# ────────────────────────────────────────────────────────────────────────────────
 def test_git_utils_end_to_end(tmp_path: Path) -> None:
     """
-    Create a temp repo, stage a file, and ensure helper functions behave.
+    Create a temp repo, stage a file, and ensure core helper functions behave.
     """
     repo = tmp_path / "repo"
     repo.mkdir()
-
-    subprocess.run(["git", "init"], cwd=repo, check=True)  # type: ignore[arg-type]
+    _init_repo(repo)
 
     # Create and stage a file
     sample = repo / "sample.txt"
     sample.write_text("hello\n")
-    subprocess.run(["git", "add", "sample.txt"], cwd=repo, check=True)  # type: ignore[arg-type]
+    subprocess.run(["git", "add", "sample.txt"], cwd=repo, check=True)  # noqa: S603
 
     # Assertions
     assert git_utils.is_git_repo(repo) is True
@@ -27,3 +49,45 @@ def test_git_utils_end_to_end(tmp_path: Path) -> None:
 
     diff = git_utils.get_staged_diff(repo)
     assert "+hello" in diff  # diff should include added line
+
+
+# ────────────────────────────────────────────────────────────────────────────────
+# Merge-conflict detection tests
+# ────────────────────────────────────────────────────────────────────────────────
+def test_no_conflicts(tmp_path: Path) -> None:
+    """Clean repo → has_merge_conflicts() should return False."""
+    _init_repo(tmp_path)
+
+    (tmp_path / "a.txt").write_text("content\n")
+    subprocess.run(["git", "add", "."], cwd=tmp_path, check=True)  # noqa: S603
+    subprocess.run(["git", "commit", "-m", "init"], cwd=tmp_path, check=True)
+
+    assert git_utils.has_merge_conflicts(tmp_path) is False
+
+
+def test_detect_conflicts(tmp_path: Path) -> None:
+    """Create diverging branches and verify conflict markers are detected."""
+    _init_repo(tmp_path)
+
+    # Capture whatever the repo’s default branch is (main or master)
+    default_branch = git_utils.get_current_branch(tmp_path)
+
+    # Commit on default branch
+    (tmp_path / "file.txt").write_text("line-1\n")
+    subprocess.run(["git", "add", "."], cwd=tmp_path, check=True)  # noqa: S603
+    subprocess.run(["git", "commit", "-m", "base"], cwd=tmp_path, check=True)
+
+    # Create feature branch with conflicting edit
+    subprocess.run(["git", "checkout", "-q", "-b", "feature"], cwd=tmp_path, check=True)
+    (tmp_path / "file.txt").write_text("feature change\n")
+    subprocess.run(["git", "commit", "-am", "feature edit"], cwd=tmp_path, check=True)
+
+    # Switch back to the original default branch
+    subprocess.run(["git", "checkout", "-q", default_branch], cwd=tmp_path, check=True)
+    (tmp_path / "file.txt").write_text("main change\n")
+    subprocess.run(["git", "commit", "-am", "main edit"], cwd=tmp_path, check=True)
+
+    # Attempt merge (will leave conflicts)
+    subprocess.run(["git", "merge", "-q", "feature"], cwd=tmp_path)  # noqa: S603
+
+    assert git_utils.has_merge_conflicts(tmp_path) is True

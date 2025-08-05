@@ -7,6 +7,7 @@ duplicating logic.
 """
 
 from __future__ import annotations
+from typing import Optional, Union
 
 import re
 import subprocess
@@ -31,7 +32,7 @@ class GitRepoError(RuntimeError):
 
 
 # Internal git helpers
-def _run_git(args: list[str], cwd: Path | str | None = None) -> str:
+def _run_git(args: list[str], cwd: Path | Optional[str] = None) -> str:
     """Run `git <args>` and return stdout (strip newline)."""
     result = subprocess.run(  # noqa: S603,S607
         ["git", *args],
@@ -69,13 +70,13 @@ def _slug_from_remote(url: str) -> str:
     raise GitRepoError(f"Cannot parse GitHub remote URL: {url}")
 
 
-def _get_repo_slug(path: Path | str) -> str:
+def _get_repo_slug(path: Union[str, Path]) -> str:
     """Return ``owner/repo`` for the given working tree."""
     remote_url = _run_git(["config", "--get", "remote.origin.url"], cwd=path)
     return _slug_from_remote(remote_url)
 
 
-def _push_current_branch(path: Path | str) -> str:
+def _push_current_branch(path: Union[str, Path]) -> str:
     """Push the current branch to origin and return its name."""
     branch = get_current_branch(path)
     _run_git(["push", "-u", "origin", branch], cwd=path)
@@ -87,9 +88,9 @@ def create_pull_request(
     title: str,
     body: str,
     *,
-    repo_path: Path | str = ".",
+    repo_path: Union[str, Path] = ".",
     base: str = "main",
-    head: str | None = None,
+    head: Optional[str] = None,
 ) -> str:
     """
     Open a GitHub pull request and return its HTML URL.
@@ -155,9 +156,9 @@ def create_draft_pull_request(
     title: str,
     body: str,
     *,
-    repo_path: Path | str = ".",
+    repo_path: Union[str, Path] = ".",
     base: str = "main",
-    head: str | None = None,
+    head: Optional[str] = None,
 ) -> str:
     """
     Same as ``create_pull_request`` but opens the PR in **draft** mode.
