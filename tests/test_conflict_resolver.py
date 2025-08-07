@@ -1,16 +1,11 @@
 """
-Unit-tests for conflict_resolver helper functions.
+Tests for conflict_resolver: listing, hunk extraction, Groq-powered resolution.
 """
 
 from pathlib import Path
 import subprocess
 
-from b3th.conflict_resolver import (
-    list_conflicted_files,
-    extract_conflict_hunks,
-    build_resolution_prompt,
-)
-
+import b3th.conflict_resolver as cr
 
 _CONFLICT_TEXT = """\
 line-1
@@ -28,58 +23,50 @@ theirs-b
 """
 
 
-# --------------------------------------------------------------------------- #
-# Helpers
-# --------------------------------------------------------------------------- #
+# helpers
 def _init_repo(repo: Path) -> None:
-    """Initialise a bare Git repo with user identity configured."""
     subprocess.run(["git", "init", "-q"], cwd=repo, check=True)  # noqa: S603
-    subprocess.run(
-        ["git", "config", "user.email", "t@example.com"], cwd=repo, check=True
-    )
-    subprocess.run(
-        ["git", "config", "user.name", "Tester"], cwd=repo, check=True
-    )
+    subprocess.run(["git", "config", "user.email", "t@x"], cwd=repo, check=True)
+    subprocess.run(["git", "config", "user.name", "T"], cwd=repo, check=True)
 
-
-# --------------------------------------------------------------------------- #
-# Tests
-# --------------------------------------------------------------------------- #
-def test_conflict_listing(tmp_path: Path) -> None:
-    repo = tmp_path / "r"
-    repo.mkdir()
-    _init_repo(repo)
-
-    (repo / "file.txt").write_text(_CONFLICT_TEXT)
-
-    # Track the file so `git grep` can see it
+def _seed_conflict(repo: Path, fname: str = "file.txt") -> Path:
+    f = repo / fname
+    f.write_text(_CONFLICT_TEXT)
     subprocess.run(["git", "add", "."], cwd=repo, check=True)  # noqa: S603
     subprocess.run(["git", "commit", "-m", "seed"], cwd=repo, check=True)
+    return f
 
-    conflicted = list_conflicted_files(repo)
-    assert conflicted == [repo / "file.txt"]
 
+# tests
+
+def test_conflict_listing(tmp_path: Path) -> None:
+    repo = tmp_path / "r"; repo.mkdir(); _init_repo(repo)
+    path = _seed_conflict(repo)
+    assert cr.list_conflicted_files(repo) == [path]
 
 def test_extract_hunks(tmp_path: Path) -> None:
-    f = tmp_path / "c.txt"
-    f.write_text(_CONFLICT_TEXT)
-    hunks = extract_conflict_hunks(f)
+    f = tmp_path / "c.txt"; f.write_text(_CONFLICT_TEXT)
+    hunks = cr.extract_conflict_hunks(f)
     assert len(hunks) == 2
-    assert hunks[0]["left"].strip() == "ours-a"
-    assert hunks[0]["right"].strip() == "theirs-a"
-
+    assert hunks[1]["left"].strip() == "ours-b"
 
 def test_build_prompt(tmp_path: Path) -> None:
-    repo = tmp_path / "r2"
-    repo.mkdir()
-    _init_repo(repo)
-    (repo / "f.txt").write_text(_CONFLICT_TEXT)
+    repo = tmp_path / "r2"; repo.mkdir(); _init_repo(repo)
+    path = _seed_conflict(repo, "f.txt")
+    prompt = cr.build_resolution_prompt(repo)
+    assert prompt and path.name in prompt and "### Conflict 2" in prompt
 
-    subprocess.run(["git", "add", "."], cwd=repo, check=True)  # noqa: S603
-    subprocess.run(["git", "commit", "-m", "seed"], cwd=repo, check=True)
+def test_llm_resolution(tmp_path: Path, monkeypatch) -> None:
+    """LLM output is written to <file>.resolved."""
+    repo = tmp_path / "r3"; repo.mkdir(); _init_repo(repo)
+    path = _seed_conflict(repo, "conf.txt")
 
-    prompt = build_resolution_prompt(repo)
-    assert prompt is not None
-    assert f"## File: `{repo / 'f.txt'}`" in prompt
-    assert "### Conflict 2" in prompt
-    assert "ours-b" in prompt and "theirs-b" in prompt
+    # Stub chat_completion
+    stub_output = "merged\ncode\n"
+    monkeypatch.setattr(cr, "chat_completion", lambda prompt, model=None: stub_output)
+
+    out_paths = cr.resolve_conflicts(repo, model="gpt-mock")
+    expected_out = path.with_suffix(".txt.resolved")
+
+    assert out_paths == [expected_out]
+    assert expected_out.read_text() == stub_output

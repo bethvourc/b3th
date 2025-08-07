@@ -1,12 +1,12 @@
 """
-Utilities for analysing unresolved Git merge conflicts and preparing
-an LLM-friendly resolution prompt.
+Analyse unresolved Git merge conflicts *and* let Groq propose resolutions.
 
 Public API
 ----------
-list_conflicted_files(repo) -> list[Path]
-extract_conflict_hunks(path) -> list[dict]
-build_resolution_prompt(repo) -> str
+list_conflicted_files(repo)        -> list[Path]
+extract_conflict_hunks(path)       -> list[dict]
+build_resolution_prompt(repo)      -> str | None
+resolve_conflicts(repo, model=…)   -> list[Path] 
 """
 
 from __future__ import annotations
@@ -15,69 +15,58 @@ import re
 from pathlib import Path
 from typing import List, Dict, Optional, Union
 
-from .git_utils import _run_git  # re-use low-level helper from step 4
+from .git_utils import _run_git  # low-level helper
+from .llm import chat_completion  # Groq wrapper
 
 
-# Locate files that still contain "<<<<<<<" markers
-_CONFLICT_MARKER = "<<<<<<< "  # Git always adds a space after the marker
-
+# 1. Locate conflicted files
+_CONFLICT_MARKER = "<<<<<<< "  # Git always adds a space after <<<<<<<
 
 def list_conflicted_files(repo: Union[str, Path] = ".") -> List[Path]:
-    """
-    Return a list of files that contain unresolved merge markers.
-
-    Uses ``git grep -l "<<<<<<< "`` for speed; falls back to an empty list
-    if repo is not a Git repository.
-    """
+    """Return a list of *tracked* files that still have conflict markers."""
     try:
         raw = _run_git(["grep", "-l", _CONFLICT_MARKER, "--", "."], cwd=repo)
-        if not raw:
-            return []
-        return [Path(repo, line.strip()) for line in raw.splitlines()]
-    except Exception:  # noqa: BLE001  (GitError or not-a-git-repo)
+        return [Path(repo, p) for p in raw.splitlines()] if raw else []
+    except Exception:  # noqa: BLE001 – GitError / not-repo
         return []
 
 
-
-# Parse conflict hunks from a single file
+# 2. Parse hunks from a given file
 _HUNK_RE = re.compile(
     r"""
-    ^<<<<<<<[ ]+(?P<ours>.*?)\n          # ours marker
+    ^<<<<<<<[ ]+(?P<ours>.*?)\n
     (?P<left>.*?)
-    ^=======$\n                          # split
+    ^=======$\n
     (?P<right>.*?)
-    ^>>>>>>>[ ]+(?P<theirs>.*?)$         # theirs marker
-""",
+    ^>>>>>>>[ ]+(?P<theirs>.*?)$
+    """,
     re.M | re.S | re.X,
 )
 
-
 def extract_conflict_hunks(path: Union[str, Path]) -> List[Dict[str, str]]:
-    """
-    Return a list of dicts, one per conflict hunk in *path*.
-
-    Dict keys: ``ours_label``, ``theirs_label``, ``left``, ``right``.
-    """
-    text = Path(path).read_text()
+    """Return list of dicts {ours_label, theirs_label, left, right} per hunk."""
     hunks: List[Dict[str, str]] = []
-    for match in _HUNK_RE.finditer(text):
+    for m in _HUNK_RE.finditer(Path(path).read_text()):
         hunks.append(
             {
-                "ours_label": match["ours"].strip(),
-                "theirs_label": match["theirs"].strip(),
-                "left": match["left"].rstrip("\n"),
-                "right": match["right"].rstrip("\n"),
+                "ours_label": m["ours"].strip(),
+                "theirs_label": m["theirs"].strip(),
+                "left": m["left"].rstrip("\n"),
+                "right": m["right"].rstrip("\n"),
             }
         )
     return hunks
 
 
+# 3. Build prompt (multi-file)
+_PROMPT_HEADER = (
+    "You are an expert Git merge-conflict resolver. For every conflict below, "
+    "return the **merged file content only**, no commentary.\n"
+)
 
-# Build Groq prompt
 def _format_hunk(i: int, h: Dict[str, str]) -> str:
     return (
         f"### Conflict {i}\n"
-        f"*Ours*: `{h['ours_label']}` — *Theirs*: `{h['theirs_label']}`\n"
         "```diff\n"
         "<<<<<<< ours\n"
         f"{h['left']}\n"
@@ -87,17 +76,8 @@ def _format_hunk(i: int, h: Dict[str, str]) -> str:
         "```"
     )
 
-
-_PROMPT_HEADER = """\
-You are an expert Git merge-conflict resolver. For each conflict below,
-produce the best merged version **only as final code**, no explanations.
-"""
-
-
 def build_resolution_prompt(repo: Union[str, Path] = ".") -> Optional[str]:
-    """
-    Return a single Markdown prompt for Groq, or *None* if no conflicts.
-    """
+    """Combine all conflicted files into one markdown prompt for Groq."""
     files = list_conflicted_files(repo)
     if not files:
         return None
@@ -107,8 +87,38 @@ def build_resolution_prompt(repo: Union[str, Path] = ".") -> Optional[str]:
         hunks = extract_conflict_hunks(f)
         if not hunks:
             continue
-        parts.append(f"\n## File: `{f}`")
-        for i, hunk in enumerate(hunks, 1):
-            parts.append(_format_hunk(i, hunk))
-
+        parts.append(f"\n## File: `{Path(f).name}`")
+        for i, h in enumerate(hunks, 1):
+            parts.append(_format_hunk(i, h))
     return "\n\n".join(parts).strip()
+
+
+# 4. NEW – Ask Groq & write <file>.resolved
+def resolve_conflicts(
+    repo: Union[str, Path] = ".",
+    *,
+    model: str | None = None,
+) -> List[Path]:
+    """
+    For every conflicted file in *repo* call the LLM and write `<file>.resolved`.
+
+    Returns the list of generated `.resolved` paths.
+    """
+    resolved_paths: List[Path] = []
+    for f in list_conflicted_files(repo):
+        hunks = extract_conflict_hunks(f)
+        if not hunks:
+            continue
+
+        # Build per-file prompt (smaller ⇒ cheaper tokens)
+        prompt_lines = [_PROMPT_HEADER, f"## File: `{Path(f).name}`"]
+        for i, h in enumerate(hunks, 1):
+            prompt_lines.append(_format_hunk(i, h))
+        prompt = "\n\n".join(prompt_lines)
+
+        merged_text: str = chat_completion(prompt, model=model)  # type: ignore[arg-type]
+        out_path = f.with_suffix(f.suffix + ".resolved")
+        Path(out_path).write_text(merged_text.rstrip() + "\n")
+        resolved_paths.append(out_path)
+
+    return resolved_paths
