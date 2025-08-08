@@ -1,27 +1,25 @@
 """
 Groq LLM wrapper.
 
-This module hides the HTTP details so the rest of the codebase can call
-`chat_completion()` and stay decoupled from any specific provider.
+Call ``chat_completion()`` with either a prompt *string* or a full list of
+OpenAI-style message dicts; the helper will do the right thing.
 """
 
 from __future__ import annotations
-from typing import Optional, Union
 
 import os
-from typing import List, Dict, Any
+from typing import Any, Dict, List, Union, Optional
 
 import requests
 
 
 class LLMError(RuntimeError):
-    """Raised when the Groq API returns an error or cannot be reached."""
+    """Raised when the Groq API returns an error or an unexpected payload."""
 
 
 
 # Internal helpers
 def _api_key() -> str:
-    """Fetch the Groq API key from the environment."""
     key = os.getenv("GROQ_API_KEY") or os.getenv("GROQ_API_TOKEN")
     if not key:
         raise LLMError(
@@ -31,22 +29,17 @@ def _api_key() -> str:
 
 
 def _api_base() -> str:
-    """Return the API base URL (override with GROQ_API_BASE if desired)."""
     return os.getenv("GROQ_API_BASE", "https://api.groq.com").rstrip("/")
 
 
 def _default_model() -> str:
-    """
-    Return the default model for chat completions.
-
-    You can override it with GROQ_MODEL_ID.
-    """
     return os.getenv("GROQ_MODEL_ID", "llama-3.3-70b-versatile")
+
 
 
 # Public function
 def chat_completion(
-    messages: List[Dict[str, str]],
+    messages: Union[str, List[Dict[str, str]]],
     *,
     model: Optional[str] = None,
     temperature: float = 0.3,
@@ -59,20 +52,26 @@ def chat_completion(
     Parameters
     ----------
     messages
-        A list of message dicts (role/content) compatible with the OpenAI schema.
+        Either a **prompt string** *or* a list of role/content dictionaries
+        following the OpenAI schema.
     model
-        Groq model ID. If None, `_default_model()` is used.
+        Groq model ID. Defaults to ``GROQ_MODEL_ID`` or a sensible fallback.
     temperature
         Sampling temperature.
     max_tokens
-        Maximum tokens for the reply.
+        Maximum tokens in the reply.
     stream
-        Whether to request a streaming response (not surfaced by this wrapper).
+        Whether to request a streaming response (ignored by this wrapper).
 
     Returns
     -------
-    The assistant's response content as a string.
+    str
+        The assistant's response content.
     """
+    # Coerce prompt into the required list-of-dicts format
+    if isinstance(messages, str):
+        messages = [{"role": "user", "content": messages}]
+
     url = f"{_api_base()}/openai/v1/chat/completions"
     headers = {
         "Authorization": f"Bearer {_api_key()}",
@@ -94,4 +93,5 @@ def chat_completion(
     try:
         return data["choices"][0]["message"]["content"]
     except (KeyError, IndexError) as exc:
-        raise LLMError("Invalid response structure from Groq API") from exc
+        raise LLMError(f"Malformed Groq response: {data}") from exc
+

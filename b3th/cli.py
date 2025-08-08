@@ -31,6 +31,8 @@ from .gh_api import (
 )
 from .stats import get_stats
 from .summarizer import summarize_commits
+from .conflict_resolver import resolve_conflicts           
+from .git_utils import get_current_branch, is_git_repo, has_merge_conflicts 
 
 app = typer.Typer(
     help="Generate AI-assisted commits, sync, and pull-requests."
@@ -188,7 +190,7 @@ def prdraft(
         typer.secho(f"Error: {exc}", fg=typer.colors.RED)
         raise typer.Exit(1)
 
-    typer.secho("\n✅ Draft pull request created!", fg=typer.colors.GREEN, bold=True)
+    typer.secho("\n Draft pull request created!", fg=typer.colors.GREEN, bold=True)
     typer.echo(pr_url)
 
 
@@ -227,9 +229,51 @@ def prcreate(
         typer.secho(f"Error: {exc}", fg=typer.colors.RED)
         raise typer.Exit(1)
 
-    typer.secho("\n✅ Pull request created!", fg=typer.colors.GREEN, bold=True)
+    typer.secho("\n Pull request created!", fg=typer.colors.GREEN, bold=True)
     typer.echo(pr_url)
 
+
+# resolve – ask the LLM to propose merged versions
+@app.command()
+def resolve(                                            # noqa: D401
+    repo: Path = typer.Argument(
+        Path("."), exists=False, dir_okay=True, file_okay=False
+    ),
+    apply: bool = typer.Option(
+        False, "--apply", "-a",
+        help="Overwrite original files with *.resolved output."
+    ),
+    model: Optional[str] = typer.Option(
+        None, "--model", "-m",
+        help="LLM model ID passed through to the resolver."
+    ),
+) -> None:
+    """
+    Generate merge-conflict resolutions using the configured LLM.
+
+    Without *--apply* it only creates `<file>.resolved` siblings.
+    """
+    if not has_merge_conflicts(repo):
+        typer.echo("No unresolved conflicts detected.")
+        raise typer.Exit()
+
+    typer.echo("Detecting conflicts & asking Groq…")
+    out_paths = resolve_conflicts(repo, model=model)
+
+    if not out_paths:
+        typer.secho("No conflicts parsed — aborting.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    typer.echo(f"💡 Generated {len(out_paths)} *.resolved file(s).")
+
+    if apply:
+        for p in out_paths:
+            orig = p.with_suffix("")        # strip ".resolved"
+            orig.write_text(p.read_text())
+            p.unlink(missing_ok=True)
+        typer.secho("Originals overwritten with proposed merges.", fg=typer.colors.GREEN)
+    else:
+        typer.echo("Inspect the *.resolved files. Re-run with --apply to accept.")
 
 if __name__ == "__main__":
     app()
