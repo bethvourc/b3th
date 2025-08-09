@@ -32,7 +32,7 @@ jobs:
         run: poetry install --no-interaction --no-root
 
       # Run tests with coverage (dummy tokens avoid real API calls)
-      - name: Run tests & enforce 80 % coverage
+      - name: Run tests & enforce 85 % coverage
         env:
           GROQ_API_KEY: dummy
           GITHUB_TOKEN: dummy
@@ -40,4 +40,4 @@ jobs:
           poetry run coverage run \
             --omit='*/tests/*,*/.venv/*,*/b3th/cli.py,*/b3th/gh_api.py' \
             -m pytest -qq
-          poetry run coverage report --fail-under=80
+          poetry run coverage report --fail-under=85
