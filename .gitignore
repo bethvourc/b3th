@@ -25,9 +25,9 @@ htmlcov/
 requirements.txt
 
 # Others
-implementation*
+implementation/
 build_and_publish.md
-future_implementation.md
+
 
 # Project specific
 copyfiles*
