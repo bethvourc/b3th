@@ -6,11 +6,9 @@ Usage:
 """
 
 from __future__ import annotations
-from typing import Optional, Union
 
 import textwrap
 from pathlib import Path
-from typing import Tuple, List
 
 from . import git_utils, llm
 
@@ -30,7 +28,7 @@ _SYSTEM_PROMPT: str = (
 )
 
 
-def _build_messages(diff: str) -> List[dict[str, str]]:
+def _build_messages(diff: str) -> list[dict[str, str]]:
     """Return the message list expected by llm.chat_completion()."""
     return [
         {"role": "system", "content": _SYSTEM_PROMPT},
@@ -53,12 +51,12 @@ def _build_messages(diff: str) -> List[dict[str, str]]:
 
 # Public API
 def generate_commit_message(
-    repo_path: Union[str, Path] = ".",
+    repo_path: str | Path = ".",
     *,
-    model: Optional[str] = None,
+    model: str | None = None,
     temperature: float = 0.2,
     max_tokens: int = 300,
-) -> Tuple[str, str]:
+) -> tuple[str, str]:
     """
     Return (subject, body) strings for the current staged diff.
 

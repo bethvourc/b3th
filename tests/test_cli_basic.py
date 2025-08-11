@@ -1,4 +1,5 @@
 from typer.testing import CliRunner
+
 from b3th.cli import app
 
 runner = CliRunner()

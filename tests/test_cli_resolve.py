@@ -3,6 +3,7 @@ CLI integration test for `b3th resolve`.
 """
 
 from pathlib import Path
+
 from typer.testing import CliRunner
 
 from b3th.cli import app
@@ -11,7 +12,8 @@ runner = CliRunner()
 
 
 def test_resolve_creates_files(monkeypatch, tmp_path: Path):
-    repo = tmp_path / "repo"; repo.mkdir()
+    repo = tmp_path / "repo"
+    repo.mkdir()
 
     # Pretend repo has conflicts
     monkeypatch.setattr("b3th.cli.has_merge_conflicts", lambda *_: True, raising=True)
@@ -24,7 +26,9 @@ def test_resolve_creates_files(monkeypatch, tmp_path: Path):
     for p in resolved:
         p.write_text("merged\n")
 
-    monkeypatch.setattr("b3th.cli.resolve_conflicts", lambda *_a, **_k: resolved, raising=True)
+    monkeypatch.setattr(
+        "b3th.cli.resolve_conflicts", lambda *_a, **_k: resolved, raising=True
+    )
 
     result = runner.invoke(app, ["resolve", str(repo)])
     assert result.exit_code == 0
@@ -32,14 +36,18 @@ def test_resolve_creates_files(monkeypatch, tmp_path: Path):
 
 
 def test_resolve_apply_overwrites(monkeypatch, tmp_path: Path):
-    repo = tmp_path / "r2"; repo.mkdir()
-    orig = repo / "x.txt"; orig.write_text("<<<<<<<")          # dummy
+    repo = tmp_path / "r2"
+    repo.mkdir()
+    orig = repo / "x.txt"
+    orig.write_text("<<<<<<<")  # dummy
 
     # Fake conflict detection + resolver
     monkeypatch.setattr("b3th.cli.has_merge_conflicts", lambda *_: True, raising=True)
     resolved_path = orig.with_suffix(".txt.resolved")
     resolved_path.write_text("merged\n")
-    monkeypatch.setattr("b3th.cli.resolve_conflicts", lambda *_a, **_k: [resolved_path], raising=True)
+    monkeypatch.setattr(
+        "b3th.cli.resolve_conflicts", lambda *_a, **_k: [resolved_path], raising=True
+    )
 
     res = runner.invoke(app, ["resolve", str(repo), "--apply"])
     assert res.exit_code == 0

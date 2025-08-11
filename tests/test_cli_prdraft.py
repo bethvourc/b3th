@@ -1,8 +1,6 @@
 """Tests for the `b3th prdraft` command."""
 
 from pathlib import Path
-from types import SimpleNamespace
-from unittest.mock import patch
 
 from typer.testing import CliRunner
 
@@ -13,7 +11,8 @@ runner = CliRunner()
 
 def test_prdraft_happy(monkeypatch, tmp_path: Path):
     """Open a draft PR and echo URL."""
-    repo = tmp_path / "repo"; repo.mkdir()
+    repo = tmp_path / "repo"
+    repo.mkdir()
 
     # Pretend we are in a git repo
     monkeypatch.setattr("b3th.cli.is_git_repo", lambda *_: True, raising=True)

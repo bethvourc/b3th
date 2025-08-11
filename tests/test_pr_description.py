@@ -11,7 +11,6 @@ import pytest
 
 from b3th import pr_description as prd
 
-
 FAKE_DIFF = """
  foo.py | 2 +-
  bar.py | 1 +

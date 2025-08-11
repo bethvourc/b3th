@@ -1,8 +1,8 @@
-import pytest
 from unittest.mock import patch
 
-from b3th import commit_message as cm
+import pytest
 
+from b3th import commit_message as cm
 
 FAKE_DIFF = """
 diff --git a/foo.py b/foo.py
@@ -41,9 +41,7 @@ def test_generate_commit_message_success(monkeypatch):
 
 def test_generate_commit_message_no_diff(monkeypatch):
     """Should raise CommitMessageError when nothing is staged."""
-    monkeypatch.setattr(
-        cm.git_utils, "get_staged_diff", lambda _: "", raising=True
-    )
+    monkeypatch.setattr(cm.git_utils, "get_staged_diff", lambda _: "", raising=True)
 
     with pytest.raises(cm.CommitMessageError):
         cm.generate_commit_message(".")
