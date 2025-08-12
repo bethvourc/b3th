@@ -2,7 +2,6 @@
 
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
 
 from typer.testing import CliRunner
 
@@ -42,5 +41,12 @@ def test_sync_full_flow(monkeypatch, tmp_path: Path):
     assert result.exit_code == 0
 
     assert ["git", "add", "--all"] in calls
-    assert ["git", "commit", "-m", "feat: greet", "-m", "add friendly greeting"] in calls
+    assert [
+        "git",
+        "commit",
+        "-m",
+        "feat: greet",
+        "-m",
+        "add friendly greeting",
+    ] in calls
     assert ["git", "push", "-u", "origin", "feat-x"] in calls

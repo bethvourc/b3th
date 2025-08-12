@@ -6,12 +6,10 @@ Usage:
 """
 
 from __future__ import annotations
-from typing import Optional, Union
 
 import subprocess
 import textwrap
 from pathlib import Path
-from typing import Tuple, List
 
 from . import llm
 from .git_utils import GitError, is_git_repo
@@ -22,7 +20,7 @@ class PRDescriptionError(RuntimeError):
 
 
 # Internal git helpers
-def _run_git(args: List[str], cwd: Path | Optional[str] = None) -> str:
+def _run_git(args: list[str], cwd: Path | str | None = None) -> str:
     """Run `git <args>` and return stdout (strip newline)."""
     result = subprocess.run(  # noqa: S603,S607
         ["git", *args],
@@ -35,17 +33,14 @@ def _run_git(args: List[str], cwd: Path | Optional[str] = None) -> str:
     return result.stdout.strip()
 
 
-def _branch_diff(repo_path: Union[str, Path], base: str) -> str:
+def _branch_diff(repo_path: str | Path, base: str) -> str:
     """Return `git diff --stat` output between *base* and HEAD."""
     return _run_git(["diff", "--stat", f"{base}..HEAD"], cwd=repo_path)
 
 
-def _commit_messages(repo_path: Union[str, Path], base: str) -> str:
+def _commit_messages(repo_path: str | Path, base: str) -> str:
     """Return one-line commit summaries between *base* and HEAD (oldest→newest)."""
-    return _run_git(
-        ["log", "--reverse", "--pretty=%s", f"{base}..HEAD"], cwd=repo_path
-    )
-
+    return _run_git(["log", "--reverse", "--pretty=%s", f"{base}..HEAD"], cwd=repo_path)
 
 
 # Prompt helpers
@@ -62,7 +57,7 @@ _SYSTEM_PROMPT: str = (
 )
 
 
-def _build_messages(diff: str, commits: str) -> List[dict[str, str]]:
+def _build_messages(diff: str, commits: str) -> list[dict[str, str]]:
     """Return the list of messages for llm.chat_completion()."""
     user_msg = textwrap.dedent(
         f"""
@@ -88,16 +83,15 @@ def _build_messages(diff: str, commits: str) -> List[dict[str, str]]:
     ]
 
 
-
 # Public API
 def generate_pr_description(
-    repo_path: Union[str, Path] = ".",
+    repo_path: str | Path = ".",
     *,
     base: str = "main",
-    model: Optional[str] = None,
+    model: str | None = None,
     temperature: float = 0.2,
     max_tokens: int = 600,
-) -> Tuple[str, str]:
+) -> tuple[str, str]:
     """
     Return (title, body) strings for a pull-request.
 

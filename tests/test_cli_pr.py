@@ -1,8 +1,6 @@
 """Tests for the `b3th prcreate` command."""
 
 from pathlib import Path
-from types import SimpleNamespace
-from unittest.mock import patch
 
 from typer.testing import CliRunner
 

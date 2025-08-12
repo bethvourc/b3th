@@ -32,9 +32,9 @@ def patch_click_make_metavar() -> None:
     want = len(signature(_orig).parameters) - 1  # exclude `self`
 
     def _shim(self, *args, **kwargs):  # noqa: D401
-        supplied = list(args[:want])               # use what Typer gave us
-        if len(supplied) < want:                   # pad if Typer gave fewer
+        supplied = list(args[:want])  # use what Typer gave us
+        if len(supplied) < want:  # pad if Typer gave fewer
             supplied.extend([None] * (want - len(supplied)))
-        return _orig(self, *supplied)              # ignore **kwargs entirely
+        return _orig(self, *supplied)  # ignore **kwargs entirely
 
     Parameter.make_metavar = _shim  # type: ignore[assignment]

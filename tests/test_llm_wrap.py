@@ -1,5 +1,7 @@
 from types import SimpleNamespace
+
 from b3th.llm import chat_completion
+
 
 def test_chat_completion_wraps_string_prompt(monkeypatch):
     """String prompts should be converted into a single user message."""

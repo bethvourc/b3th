@@ -6,38 +6,47 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
 jobs:
   tests:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         python-version: ["3.9", "3.10", "3.11", "3.12"]
 
     steps:
-      # Checkout source
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      # Set up Python (no Poetry cache because poetry.lock is not committed)
-      - uses: actions/setup-python@v5
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
 
-      # Install Poetry
-      - uses: abatilo/actions-poetry@v3
+      - name: Install Poetry
+        uses: abatilo/actions-poetry@v3
         with:
           poetry-version: "1.8.3"
 
-      # Install project + dev dependencies
-      - name: Install dependencies
-        run: poetry install --no-interaction --no-root
-
-      # Run tests with coverage (dummy tokens avoid real API calls)
-      - name: Run tests & enforce 85 % coverage
-        env:
-          GROQ_API_KEY: dummy
-          GITHUB_TOKEN: dummy
+      - name: Configure Poetry (in-project venv)
         run: |
-          poetry run coverage run \
-            --omit='*/tests/*,*/.venv/*,*/b3th/cli.py,*/b3th/gh_api.py' \
-            -m pytest -qq
-          poetry run coverage report --fail-under=85
+          poetry config virtualenvs.create true
+          poetry config virtualenvs.in-project true
+
+      - name: Install deps
+        run: poetry install --no-interaction --no-ansi
+
+      - name: Run tests (pytest-cov via pyproject)
+        env:
+          # Keep tests deterministic: no real secrets leaking in
+          GITHUB_TOKEN: ""
+          GITHUB_PAT: ""
+          GROQ_API_KEY: ""
+        run: poetry run pytest -q

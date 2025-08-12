@@ -5,32 +5,25 @@ Step 6: send commit list to Groq and return a natural-language paragraph.
 """
 
 from __future__ import annotations
-from typing import Optional, Union
 
 import textwrap
 from pathlib import Path
-from typing import List
 
-from .git_utils import get_last_commits, is_git_repo
 from . import llm
+from .git_utils import get_last_commits, is_git_repo
 
 
 class SummarizerError(RuntimeError):
     """Raised when commits cannot be summarized."""
 
 
-
 # Data extraction helpers
-def _commits_markdown(commits: List[dict]) -> str:
+def _commits_markdown(commits: list[dict]) -> str:
     """Convert commit dicts to a clean Markdown bullet list."""
-    return "\n".join(
-        f"* {c['date']}  {c['abbrev']}  {c['subject']}" for c in commits
-    )
+    return "\n".join(f"* {c['date']}  {c['abbrev']}  {c['subject']}" for c in commits)
 
 
-def prepare_commits_for_llm(
-    repo_path: Union[str, Path] = ".", n: int = 10
-) -> str:
+def prepare_commits_for_llm(repo_path: str | Path = ".", n: int = 10) -> str:
     """
     Return a Markdown bullet list of the last *n* commits.
 
@@ -49,7 +42,6 @@ def prepare_commits_for_llm(
     return _commits_markdown(commits)
 
 
-
 # Public API
 _SYSTEM_PROMPT = (
     "You are a helpful assistant who summarises Git commit history. "
@@ -61,7 +53,7 @@ _SYSTEM_PROMPT = (
 
 
 def summarize_commits(
-    repo_path: Union[str, Path] = ".", n: int = 10, *, model: Optional[str] = None
+    repo_path: str | Path = ".", n: int = 10, *, model: str | None = None
 ) -> str:
     """
     Return an LLM-generated paragraph summarising the last *n* commits.

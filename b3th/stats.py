@@ -7,12 +7,10 @@ Example:
 """
 
 from __future__ import annotations
-from typing import Optional, Union
 
 import re
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict
 
 from .git_utils import is_git_repo, run_git
 
@@ -21,9 +19,8 @@ class StatsError(RuntimeError):
     """Raised when statistics cannot be collected."""
 
 
-
 # Helpers
-def _parse_last(value: Optional[str]) -> Optional[str]:
+def _parse_last(value: str | None) -> str | None:
     """Convert '7d', '2w', '1m' to ISO date for `git --since`."""
     if value is None:
         return None
@@ -36,18 +33,15 @@ def _parse_last(value: Optional[str]) -> Optional[str]:
     delta = (
         timedelta(days=amount)
         if unit == "d"
-        else timedelta(weeks=amount)
-        if unit == "w"
-        else timedelta(days=30 * amount)
+        else timedelta(weeks=amount) if unit == "w" else timedelta(days=30 * amount)
     )
     return (datetime.now() - delta).strftime("%Y-%m-%d")
 
 
-
 # Core API
 def get_stats(
-    repo_path: Union[str, Path] = ".", *, last: Optional[str] = None
-) -> Dict[str, int]:
+    repo_path: str | Path = ".", *, last: str | None = None
+) -> dict[str, int]:
     """Return commit count, unique files changed, insertions, deletions."""
     repo_path = Path(repo_path)
     if not is_git_repo(repo_path):
@@ -56,7 +50,7 @@ def get_stats(
     since_arg = _parse_last(last)
     log_range = ["--since", since_arg] if since_arg else []
 
-    # commits 
+    # commits
     log_output = run_git(
         ["log", "--all", "--oneline", *log_range, "--pretty=%h"], cwd=repo_path
     )
@@ -65,7 +59,7 @@ def get_stats(
     if commit_count == 0:
         return {"commits": 0, "files": 0, "additions": 0, "deletions": 0}
 
-    # numstat for file/line counts 
+    # numstat for file/line counts
     numstat = run_git(
         ["log", "--all", *log_range, "--pretty=tformat:", "--numstat"],
         cwd=repo_path,
@@ -97,7 +91,7 @@ def get_stats(
 
 # CLI helper
 def print_stats(
-    repo_path: Union[str, Path] = ".", last: Optional[str] = None
+    repo_path: str | Path = ".", last: str | None = None
 ) -> None:  # pragma: no cover
     """Pretty-print stats to stdout (used by `b3th stats`)."""
     data = get_stats(repo_path, last=last)

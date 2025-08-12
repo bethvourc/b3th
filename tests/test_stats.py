@@ -5,8 +5,6 @@ All Git calls are stubbed so no real repository is needed.
 """
 
 from pathlib import Path
-from types import SimpleNamespace
-from typing import List
 
 from b3th import stats as st
 
@@ -19,12 +17,14 @@ def _fake_run_git_factory(commit_log: str, numstat: str):
         • '--pretty=%h'  -> commit_log
         • '--numstat'    -> numstat
     """
-    def _fake_run_git(args: List[str], cwd=None):  # noqa: ANN001
+
+    def _fake_run_git(args: list[str], cwd=None):  # noqa: ANN001
         if "--pretty=%h" in args:
             return commit_log
         if "--numstat" in args:
             return numstat
         return ""
+
     return _fake_run_git
 
 
@@ -47,9 +47,7 @@ def test_stats_counts(monkeypatch, tmp_path: Path):
 def test_stats_no_commits(monkeypatch, tmp_path: Path):
     """When git log returns nothing, all counts should be zero."""
     monkeypatch.setattr(st, "is_git_repo", lambda _: True, raising=True)
-    monkeypatch.setattr(
-        st, "run_git", _fake_run_git_factory("", ""), raising=True
-    )
+    monkeypatch.setattr(st, "run_git", _fake_run_git_factory("", ""), raising=True)
 
     result = st.get_stats(tmp_path, last="7d")
     assert result == {"commits": 0, "files": 0, "additions": 0, "deletions": 0}

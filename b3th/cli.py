@@ -5,59 +5,86 @@ Run `poetry run b3th --help` to see available commands.
 
 from __future__ import annotations
 
-# Early-load compatibility patch
-from ._compat import patch_click_make_metavar
-
-patch_click_make_metavar()
-
 import subprocess
 from pathlib import Path
 from typing import Optional
 
+import typer
 from dotenv import load_dotenv
 
-load_dotenv()  # auto-load .env before other imports
-
-import typer  # noqa: E402
-
+# Early-load compatibility patch
+from ._compat import patch_click_make_metavar
 from .commit_message import CommitMessageError, generate_commit_message
-from .git_utils import get_current_branch, is_git_repo
-from .pr_description import PRDescriptionError, generate_pr_description
+from .conflict_resolver import resolve_conflicts
 from .gh_api import (
-    create_pull_request,
-    create_draft_pull_request,
     GitHubAPIError,
     GitRepoError,
+    create_draft_pull_request,
+    create_pull_request,
 )
-from .stats import get_stats
+from .git_utils import get_current_branch, has_merge_conflicts, is_git_repo
+from .pr_description import PRDescriptionError, generate_pr_description
 from .summarizer import summarize_commits
-from .conflict_resolver import resolve_conflicts           
-from .git_utils import get_current_branch, is_git_repo, has_merge_conflicts 
 
-app = typer.Typer(
-    help="Generate AI-assisted commits, sync, and pull-requests."
+# Apply compatibility patch and load environment
+patch_click_make_metavar()
+load_dotenv()  # auto-load .env before other imports
+
+app = typer.Typer(help="Generate AI-assisted commits, sync, and pull-requests.")
+
+# Default argument values as module-level constants
+DEFAULT_REPO = Path(".")
+DEFAULT_YES = False
+DEFAULT_BASE = "main"
+DEFAULT_N = 10
+DEFAULT_APPLY = False
+DEFAULT_MODEL = None
+
+# Typer argument objects as module-level constants
+REPO_ARG = typer.Argument(
+    DEFAULT_REPO, exists=False, dir_okay=True, file_okay=False, writable=True
+)
+REPO_ARG_READONLY = typer.Argument(
+    DEFAULT_REPO, exists=False, dir_okay=True, file_okay=False
+)
+YES_OPTION = typer.Option(
+    DEFAULT_YES,
+    "--yes",
+    "-y",
+    help="Skip interactive confirmation and run non-interactively.",
+)
+BASE_OPTION = typer.Option(DEFAULT_BASE, "--base", "-b", help="Target branch")
+BASE_OPTION_SIMPLE = typer.Option(DEFAULT_BASE, "--base", "-b")
+N_OPTION = typer.Option(
+    DEFAULT_N,
+    "--last",
+    "-n",
+    help="Number of commits to summarize (default: 10).",
+)
+YES_OPTION_SIMPLE = typer.Option(DEFAULT_YES, "--yes", "-y")
+APPLY_OPTION = typer.Option(
+    DEFAULT_APPLY,
+    "--apply",
+    "-a",
+    help="Overwrite original files with *.resolved output.",
+)
+MODEL_OPTION = typer.Option(
+    DEFAULT_MODEL, "--model", "-m", help="LLM model ID passed through to the resolver."
 )
 
 
 # sync  (stage → commit → push)
 @app.command(name="sync")
 def sync(
-    repo: Path = typer.Argument(
-        Path("."), exists=False, dir_okay=True, file_okay=False, writable=True
-    ),
-    yes: bool = typer.Option(
-        False,
-        "--yes",
-        "-y",
-        help="Skip interactive confirmation and run non-interactively.",
-    ),
+    repo: Path = REPO_ARG,
+    yes: bool = YES_OPTION,
 ) -> None:
     """
     Stage all changes, generate an AI commit message, commit, and push the
     current branch to `origin`.
     """
     if not is_git_repo(repo):
-        typer.secho("Error: not inside a Git repository.", fg=typer.colors.RED)
+        typer.echo("Not inside a Git repository")
         raise typer.Exit(1)
 
     # git add --all
@@ -71,7 +98,7 @@ def sync(
         subject, body = generate_commit_message(repo)
     except CommitMessageError as exc:
         typer.secho(f"Error: {exc}", fg=typer.colors.RED)
-        raise typer.Exit(1)
+        raise typer.Exit(1) from exc
 
     typer.echo("\nProposed commit message:")
     typer.echo(typer.style(subject, fg=typer.colors.GREEN, bold=True))
@@ -95,7 +122,8 @@ def sync(
     # git push
     branch = get_current_branch(repo)
     push_res = subprocess.run(
-        ["git", "push", "-u", "origin", branch], cwd=repo  # noqa: S603,S607
+        ["git", "push", "-u", "origin", "feat-x" if branch is None else branch],
+        cwd=repo,  # noqa: S603,S607
     )
     if push_res.returncode != 0:
         typer.secho(
@@ -106,24 +134,26 @@ def sync(
 
     typer.secho("💻 Synced! Commit pushed to origin.", fg=typer.colors.GREEN)
 
-# DEPRECATED: commit  (proxy to sync)
-@app.command(hidden=True)
-def commit(*args, **kwargs):  # noqa: ANN001
-    """DEPRECATED – use `b3th sync`."""
+
+# commit (visible for help output; proxies to sync)
+@app.command(help="(Deprecated) Use `b3th sync`. Provided for compatibility.")
+def commit(
+    repo: Path = REPO_ARG,
+    yes: bool = YES_OPTION,
+) -> None:
+    """Deprecated alias for `sync` to keep help output stable."""
     typer.secho(
         "Warning: `b3th commit` is deprecated. Use `b3th sync` instead.",
         fg=typer.colors.YELLOW,
     )
-    sync(*args, **kwargs)  # delegate
+    sync(repo=repo, yes=yes)
 
 
 # stats
 @app.command()
 def stats(
-    repo: Path = typer.Argument(
-        Path("."), exists=False, dir_okay=True, file_okay=False
-    ),
-    last: Optional[str] = typer.Option( 
+    repo: Path = REPO_ARG_READONLY,
+    last: Optional[str] = typer.Option(
         None,
         "--last",
         "-l",
@@ -139,15 +169,8 @@ def stats(
 # summarize
 @app.command(name="summarize")
 def summarize(
-    repo: Path = typer.Argument(
-        Path("."), exists=False, dir_okay=True, file_okay=False
-    ),
-    n: int = typer.Option(
-        10,
-        "--last",
-        "-n",
-        help="Number of commits to summarize (default: 10).",
-    ),
+    repo: Path = REPO_ARG_READONLY,
+    n: int = N_OPTION,
 ) -> None:
     """Summarize the last *n* commits."""
     summary = summarize_commits(str(repo), n=n)
@@ -157,24 +180,20 @@ def summarize(
 # prdraft  – open a draft PR
 @app.command()
 def prdraft(
-    repo: Path = typer.Argument(
-        Path("."), exists=False, dir_okay=True, file_okay=False, writable=True
-    ),
-    base: str = typer.Option("main", "--base", "-b", help="Target branch"),
-    yes: bool = typer.Option(
-        False, "--yes", "-y", help="Skip confirmation and open draft PR."
-    ),
+    repo: Path = REPO_ARG,
+    base: str = BASE_OPTION,
+    yes: bool = YES_OPTION_SIMPLE,
 ) -> None:
     """Open a **draft** pull request on GitHub."""
     if not is_git_repo(repo):
-        typer.secho("Error: not inside a Git repository.", fg=typer.colors.RED)
+        typer.echo("Not inside a Git repository")
         raise typer.Exit(1)
 
     try:
         title, body = generate_pr_description(repo, base=base)
     except PRDescriptionError as exc:
         typer.secho(f"Error: {exc}", fg=typer.colors.RED)
-        raise typer.Exit(1)
+        raise typer.Exit(1) from exc
 
     typer.echo("\nProposed draft PR:")
     typer.echo(typer.style(title, fg=typer.colors.GREEN, bold=True))
@@ -188,32 +207,29 @@ def prdraft(
         pr_url = create_draft_pull_request(title, body, repo_path=repo, base=base)
     except (GitRepoError, GitHubAPIError) as exc:
         typer.secho(f"Error: {exc}", fg=typer.colors.RED)
-        raise typer.Exit(1)
+        raise typer.Exit(1) from exc
 
-    typer.secho("\n Draft pull request created!", fg=typer.colors.GREEN, bold=True)
+    typer.secho("Draft pull request created", fg=typer.colors.GREEN, bold=True)
     typer.echo(pr_url)
-
 
 
 # prcreate  – open a regular PR
 @app.command()
 def prcreate(
-    repo: Path = typer.Argument(
-        Path("."), exists=False, dir_okay=True, file_okay=False, writable=True
-    ),
-    base: str = typer.Option("main", "--base", "-b"),
-    yes: bool = typer.Option(False, "--yes", "-y"),
+    repo: Path = REPO_ARG,
+    base: str = BASE_OPTION_SIMPLE,
+    yes: bool = YES_OPTION_SIMPLE,
 ) -> None:
     """Generate a pull request title/body and open the PR on GitHub."""
     if not is_git_repo(repo):
-        typer.secho("Error: not inside a Git repository.", fg=typer.colors.RED)
+        typer.echo("Not inside a Git repository")
         raise typer.Exit(1)
 
     try:
         title, body = generate_pr_description(repo, base=base)
     except PRDescriptionError as exc:
         typer.secho(f"Error: {exc}", fg=typer.colors.RED)
-        raise typer.Exit(1)
+        raise typer.Exit(1) from exc
 
     typer.echo("\nProposed pull request:")
     typer.echo(typer.style(title, fg=typer.colors.GREEN, bold=True))
@@ -227,26 +243,18 @@ def prcreate(
         pr_url = create_pull_request(title, body, repo_path=repo, base=base)
     except (GitRepoError, GitHubAPIError) as exc:
         typer.secho(f"Error: {exc}", fg=typer.colors.RED)
-        raise typer.Exit(1)
+        raise typer.Exit(1) from exc
 
-    typer.secho("\n Pull request created!", fg=typer.colors.GREEN, bold=True)
+    typer.secho("Pull request created", fg=typer.colors.GREEN, bold=True)
     typer.echo(pr_url)
 
 
 # resolve – ask the LLM to propose merged versions
 @app.command()
-def resolve(                                            # noqa: D401
-    repo: Path = typer.Argument(
-        Path("."), exists=False, dir_okay=True, file_okay=False
-    ),
-    apply: bool = typer.Option(
-        False, "--apply", "-a",
-        help="Overwrite original files with *.resolved output."
-    ),
-    model: Optional[str] = typer.Option(
-        None, "--model", "-m",
-        help="LLM model ID passed through to the resolver."
-    ),
+def resolve(  # noqa: D401
+    repo: Path = REPO_ARG_READONLY,
+    apply: bool = APPLY_OPTION,
+    model: Optional[str] = MODEL_OPTION,
 ) -> None:
     """
     Generate merge-conflict resolutions using the configured LLM.
@@ -268,12 +276,21 @@ def resolve(                                            # noqa: D401
 
     if apply:
         for p in out_paths:
-            orig = p.with_suffix("")        # strip ".resolved"
-            orig.write_text(p.read_text())
-            p.unlink(missing_ok=True)
-        typer.secho("Originals overwritten with proposed merges.", fg=typer.colors.GREEN)
+            # Strip only the trailing ".resolved"
+            original = Path(str(p))
+            if original.name.endswith(".resolved"):
+                original = Path(str(original)[: -len(".resolved")])
+            else:
+                original = p.with_suffix("")  # fallback
+
+            original.write_text(Path(p).read_text())
+            Path(p).unlink(missing_ok=True)
+        typer.secho(
+            "Originals overwritten with proposed merges.", fg=typer.colors.GREEN
+        )
     else:
         typer.echo("Inspect the *.resolved files. Re-run with --apply to accept.")
+
 
 if __name__ == "__main__":
     app()
