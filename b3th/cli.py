@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import subprocess
 from pathlib import Path
+from typing import Optional
 
 import typer
 from dotenv import load_dotenv
@@ -152,7 +153,7 @@ def commit(
 @app.command()
 def stats(
     repo: Path = REPO_ARG_READONLY,
-    last: str | None = typer.Option(
+    last: Optional[str] = typer.Option(
         None,
         "--last",
         "-l",
@@ -253,7 +254,7 @@ def prcreate(
 def resolve(  # noqa: D401
     repo: Path = REPO_ARG_READONLY,
     apply: bool = APPLY_OPTION,
-    model: str | None = MODEL_OPTION,
+    model: Optional[str] = MODEL_OPTION,
 ) -> None:
     """
     Generate merge-conflict resolutions using the configured LLM.
