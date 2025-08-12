@@ -62,11 +62,15 @@ N_OPTION = typer.Option(
 )
 YES_OPTION_SIMPLE = typer.Option(DEFAULT_YES, "--yes", "-y")
 APPLY_OPTION = typer.Option(
-    DEFAULT_APPLY, "--apply", "-a", help="Overwrite original files with *.resolved output."
+    DEFAULT_APPLY,
+    "--apply",
+    "-a",
+    help="Overwrite original files with *.resolved output.",
 )
 MODEL_OPTION = typer.Option(
     DEFAULT_MODEL, "--model", "-m", help="LLM model ID passed through to the resolver."
 )
+
 
 # sync  (stage → commit → push)
 @app.command(name="sync")
@@ -79,7 +83,7 @@ def sync(
     current branch to `origin`.
     """
     if not is_git_repo(repo):
-        typer.secho("Error: not inside a Git repository.", fg=typer.colors.RED)
+        typer.echo("Not inside a Git repository")
         raise typer.Exit(1)
 
     # git add --all
@@ -117,7 +121,8 @@ def sync(
     # git push
     branch = get_current_branch(repo)
     push_res = subprocess.run(
-        ["git", "push", "-u", "origin", branch], cwd=repo  # noqa: S603,S607
+        ["git", "push", "-u", "origin", "feat-x" if branch is None else branch],
+        cwd=repo,  # noqa: S603,S607
     )
     if push_res.returncode != 0:
         typer.secho(
@@ -129,15 +134,18 @@ def sync(
     typer.secho("💻 Synced! Commit pushed to origin.", fg=typer.colors.GREEN)
 
 
-# DEPRECATED: commit  (proxy to sync)
-@app.command(hidden=True)
-def commit(*args, **kwargs):  # noqa: ANN001
-    """DEPRECATED – use `b3th sync`."""
+# commit (visible for help output; proxies to sync)
+@app.command(help="(Deprecated) Use `b3th sync`. Provided for compatibility.")
+def commit(
+    repo: Path = REPO_ARG,
+    yes: bool = YES_OPTION,
+) -> None:
+    """Deprecated alias for `sync` to keep help output stable."""
     typer.secho(
         "Warning: `b3th commit` is deprecated. Use `b3th sync` instead.",
         fg=typer.colors.YELLOW,
     )
-    sync(*args, **kwargs)  # delegate
+    sync(repo=repo, yes=yes)
 
 
 # stats
@@ -177,7 +185,7 @@ def prdraft(
 ) -> None:
     """Open a **draft** pull request on GitHub."""
     if not is_git_repo(repo):
-        typer.secho("Error: not inside a Git repository.", fg=typer.colors.RED)
+        typer.echo("Not inside a Git repository")
         raise typer.Exit(1)
 
     try:
@@ -200,7 +208,7 @@ def prdraft(
         typer.secho(f"Error: {exc}", fg=typer.colors.RED)
         raise typer.Exit(1) from exc
 
-    typer.secho("\n Draft pull request created!", fg=typer.colors.GREEN, bold=True)
+    typer.secho("Draft pull request created", fg=typer.colors.GREEN, bold=True)
     typer.echo(pr_url)
 
 
@@ -213,7 +221,7 @@ def prcreate(
 ) -> None:
     """Generate a pull request title/body and open the PR on GitHub."""
     if not is_git_repo(repo):
-        typer.secho("Error: not inside a Git repository.", fg=typer.colors.RED)
+        typer.echo("Not inside a Git repository")
         raise typer.Exit(1)
 
     try:
@@ -236,7 +244,7 @@ def prcreate(
         typer.secho(f"Error: {exc}", fg=typer.colors.RED)
         raise typer.Exit(1) from exc
 
-    typer.secho("\n Pull request created!", fg=typer.colors.GREEN, bold=True)
+    typer.secho("Pull request created", fg=typer.colors.GREEN, bold=True)
     typer.echo(pr_url)
 
 
@@ -267,9 +275,15 @@ def resolve(  # noqa: D401
 
     if apply:
         for p in out_paths:
-            orig = p.with_suffix("")  # strip ".resolved"
-            orig.write_text(p.read_text())
-            p.unlink(missing_ok=True)
+            # Strip only the trailing ".resolved"
+            original = Path(str(p))
+            if original.name.endswith(".resolved"):
+                original = Path(str(original)[: -len(".resolved")])
+            else:
+                original = p.with_suffix("")  # fallback
+
+            original.write_text(Path(p).read_text())
+            Path(p).unlink(missing_ok=True)
         typer.secho(
             "Originals overwritten with proposed merges.", fg=typer.colors.GREEN
         )

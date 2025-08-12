@@ -26,15 +26,21 @@ theirs-b
 # helpers
 def _init_repo(repo: Path) -> None:
     subprocess.run(["git", "init", "-q"], cwd=repo, check=True)  # noqa: S603,S607
-    subprocess.run(["git", "config", "user.email", "t@x"], cwd=repo, check=True)  # noqa: S603,S607
-    subprocess.run(["git", "config", "user.name", "T"], cwd=repo, check=True)  # noqa: S603,S607
+    subprocess.run(
+        ["git", "config", "user.email", "t@x"], cwd=repo, check=True
+    )  # noqa: S603,S607
+    subprocess.run(
+        ["git", "config", "user.name", "T"], cwd=repo, check=True
+    )  # noqa: S603,S607
 
 
 def _seed_conflict(repo: Path, fname: str = "file.txt") -> Path:
     f = repo / fname
     f.write_text(_CONFLICT_TEXT)
     subprocess.run(["git", "add", "."], cwd=repo, check=True)  # noqa: S603,S607
-    subprocess.run(["git", "commit", "-m", "seed"], cwd=repo, check=True)  # noqa: S603,S607
+    subprocess.run(
+        ["git", "commit", "-m", "seed"], cwd=repo, check=True
+    )  # noqa: S603,S607
     return f
 
 
