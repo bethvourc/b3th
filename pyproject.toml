@@ -113,11 +113,11 @@ testpaths = ["tests"]
 branch = true
 source = ["b3th"]
 omit = [
-  "b3th/llm.py",   
+  "b3th/llm.py",
 ]
 
 [tool.coverage.report]
-fail_under = 85
+# NOTE: threshold is controlled by pytest addopts (--cov-fail-under)
 show_missing = true
 skip_covered = true
 precision = 1
