@@ -17,8 +17,8 @@
 
 _(The legacy `b3th commit` still works but prints a deprecation warning and delegates to **sync**.)_
 
-Under the hood, b3th leverages **Groq’s Chat Completions API** for language
-generation and the **GitHub REST API** for PR creation.
+Under the hood, b3th leverages **Groq’s Chat Completions API** for language generation and the **GitHub REST API** for PR creation.
+It also **auto-loads environment variables** from a project `.env` **and** your **user-level `.env`** so credentials “just work”.
 
 ---
 
@@ -28,8 +28,7 @@ generation and the **GitHub REST API** for PR creation.
 
 - **Python ≥ 3.9**
 - **Git** in your `PATH`.
-- **Poetry** (preferred) or plain `pip`.  
-  <sub>Install Poetry → `curl -sSL https://install.python-poetry.org | python3 -`</sub>
+- **Poetry** (preferred) or plain `pip`. <sub>Install Poetry → `curl -sSL https://install.python-poetry.org | python3 -`</sub>
 
 ### 2 · Install the package
 
@@ -57,16 +56,24 @@ poetry install
 
 ### 3 · Set up your secrets
 
-Create a `.env` in the project root **or** export env-vars in your shell:
+Put your credentials in **either** a project-level `.env` **or** your **user-level `.env`**:
 
 ```dotenv
-GROQ_API_KEY="sk_live_xxx"        # Get one → https://console.groq.com/keys
+# ~/.env  (user-level)  OR  <repo>/.env  (project-level)
+GROQ_API_KEY="sk_live_xxx"        # https://console.groq.com/keys
 GITHUB_TOKEN="ghp_xxx"            # PAT with repo scope → https://github.com/settings/tokens
-# Optional
+# Optional overrides
 # GROQ_MODEL_ID="llama-3.3-70b-versatile"
 ```
 
-> **Tip** b3th auto-loads `.env` at runtime via `python-dotenv`.
+> **How env loading works**
+>
+> - b3th first reads your **current process environment** (already-exported vars).
+> - Then it loads a **project `.env`** if present (repo root or parent directories).
+> - Finally, it loads your **user-level `.env`** at `~/.env`.
+> - Existing process env vars are **not overwritten** by `.env` values.
+>
+> **Security tip:** Add `.env` to your `.gitignore` and avoid committing secrets.
 
 ### 4 · (Dev only) Install Git hooks
 
@@ -111,7 +118,7 @@ $ b3th sync
 Proposed commit message:
 feat(utils): support .env loading
 
-Load environment variables automatically from a .env file using python-dotenv
+Load environment variables automatically from .env (project or user-level)
 so users don't need to export them manually each session.
 
 Proceed with commit & push? [y/N]: y
@@ -159,13 +166,21 @@ $ b3th resolve --apply
 
 ---
 
+## Releasing (GitHub Actions + Trusted Publisher)
+
+1. `poetry version patch` (or `minor`/`major`) and commit.
+2. Tag: `git tag -a v$(poetry version -s) -m "b3th v$(poetry version -s)" && git push origin v$(poetry version -s)`
+3. The workflow builds and uploads to PyPI automatically.
+
+---
+
 ## Contributing
 
 1. Fork & clone.
 2. `poetry install && pre-commit install`
 3. Create a branch: `git switch -c feat/your-idea`
 4. Run `pytest` before pushing.
-5. Open a PR—b3th’s CI enforces **≥ 85 %** coverage
+5. Open a PR—b3th’s CI enforces **≥ 85 %** coverage.
 
 ---
 
