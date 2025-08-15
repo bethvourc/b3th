@@ -18,7 +18,6 @@
 _(The legacy `b3th commit` still works but prints a deprecation warning and delegates to **sync**.)_
 
 Under the hood, b3th leverages **Groq’s Chat Completions API** for language generation and the **GitHub REST API** for PR creation.
-It also **auto-loads environment variables** from a project `.env` **and** your **user-level `.env`** so credentials “just work”.
 
 ---
 
@@ -41,6 +40,13 @@ pipx install b3th         # keeps deps isolated
 pip install --user b3th
 ```
 
+> **Important:** Installing the package is not enough.  
+> You still must provide credentials (see **“Set up your secrets”** below) via:
+>
+> - exported environment variables, or
+> - a **project-level `.env`** file, or
+> - a **TOML config file** (see examples below).
+
 </details>
 
 <details>
@@ -56,23 +62,57 @@ poetry install
 
 ### 3 · Set up your secrets
 
-Put your credentials in **either** a project-level `.env` **or** your **user-level `.env`**:
+You can provide credentials in **either** your shell environment, a **project `.env`**, or a **TOML config** file.
+
+#### A) Environment variables or project `.env` (simplest)
+
+Put this in your environment (e.g. `export` in shell init) **or** in a **project-level `.env`**:
 
 ```dotenv
-# ~/.env  (user-level)  OR  <repo>/.env  (project-level)
+# <repo>/.env   (project-level)
 GROQ_API_KEY="sk_live_xxx"        # https://console.groq.com/keys
 GITHUB_TOKEN="ghp_xxx"            # PAT with repo scope → https://github.com/settings/tokens
-# Optional overrides
+# Optional
 # GROQ_MODEL_ID="llama-3.3-70b-versatile"
 ```
 
-> **How env loading works**
+> **How `.env` loading works**
 >
-> - b3th first reads your **current process environment** (already-exported vars).
-> - Then it loads a **project `.env`** if present (repo root or parent directories).
-> - Finally, it loads your **user-level `.env`** at `~/.env`.
-> - Existing process env vars are **not overwritten** by `.env` values.
->
+> b3th auto-loads **the nearest `.env` in your project tree** (using `python-dotenv`’s `find_dotenv(usecwd=True)`).  
+> It does **not** automatically read `~/.env`. If you prefer user-level credentials, either export them in your shell or use the TOML option below.
+
+#### B) TOML config file (good for user-level/global setup)
+
+Create:
+
+```
+~/.config/b3th/config.toml
+```
+
+On macOS/Linux with XDG:
+
+```
+$XDG_CONFIG_HOME/b3th/config.toml
+```
+
+Or point to a custom file via:
+
+```
+B3TH_CONFIG=/path/to/config.toml
+```
+
+Example contents:
+
+```toml
+[github]
+token = "ghp_xxx"
+
+[groq]
+api_key = "sk_live_xxx"
+```
+
+> **Precedence:** environment variables (including values loaded from the project `.env`) take priority over TOML.
+
 > **Security tip:** Add `.env` to your `.gitignore` and avoid committing secrets.
 
 ### 4 · (Dev only) Install Git hooks
@@ -118,7 +158,7 @@ $ b3th sync
 Proposed commit message:
 feat(utils): support .env loading
 
-Load environment variables automatically from .env (project or user-level)
+Load environment variables automatically from the nearest project .env
 so users don't need to export them manually each session.
 
 Proceed with commit & push? [y/N]: y

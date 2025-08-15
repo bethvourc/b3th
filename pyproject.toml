@@ -10,7 +10,7 @@ build-backend = "poetry.core.masonry.api"
 ############################
 [tool.poetry]
 name = "b3th"
-version = "0.1.1"
+version = "0.1.2"
 description = "CLI that auto-generates commit messages and GitHub PR descriptions"
 authors = ["Bethvour <bethvourc@gmail.com>"]
 license = "MIT"
